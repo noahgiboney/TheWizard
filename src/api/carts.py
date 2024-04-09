@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from src.api import auth
 from enum import Enum
+import sqlalchemy
+from src import database as db
+from fastapi import HTTPException
 
 router = APIRouter(
     prefix="/carts",
@@ -102,8 +105,22 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
 class CartCheckout(BaseModel):
     payment: str
 
+#sell only one green bottle
 @router.post("/{cart_id}/checkout")
 def checkout(cart_id: int, cart_checkout: CartCheckout):
-    """ """
+    
+    # get inventory on green bottles
+    with db.engine.connect() as connection:
+        result = connection.execute(sqlalchemy.text("SELECT num_green_potions FROM global_inventory"))
+        inventory_data = result.fetchone()
+
+    if inventory_data is None or inventory_data[0] < 1:
+        raise HTTPException(status_code=400, detail="NO GREEN POTIONS")
+
+    # sell the potion
+    with db.engine.begin() as connection:
+        connection.execute(sqlalchemy.text("UPDATE global_inventory SET num_green_potions = num_green_potions - 1"))
+        # add 50 to db
+        connection.execute(sqlalchemy.text("UPDATE global_inventory SET gold = gold + 50"))
 
     return {"total_potions_bought": 1, "total_gold_paid": 50}
