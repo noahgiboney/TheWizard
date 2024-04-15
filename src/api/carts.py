@@ -86,11 +86,15 @@ def post_visits(visit_id: int, customers: list[Customer]):
     return "OK"
 
 carts = {}
+cart_id_counter = 0
 
 @router.post("/")
 def create_cart(new_cart: Customer):
     """Create a new cart with a unique identifier for a specific customer."""
-    cart_id = str(uuid.uuid4())  # Generate a unique identifier for the cart
+    global cart_id_counter  # Use the global variable to keep track of the last used ID
+    cart_id_counter += 1  # Increment the cart ID counter to get a new unique ID
+    cart_id = cart_id_counter  # Use the incremented counter as the new cart ID
+
     # Store the cart with customer details and an initially empty dictionary of items
     carts[cart_id] = {
         "customer": new_cart.dict(),
