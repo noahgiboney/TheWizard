@@ -40,7 +40,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
                 """
                 connection.execute(sqlalchemy.text(sql_update_potions))
                 
-                # Update ml in the db
+                # update ml in the db
                 sql_update_ml = f"""
                     UPDATE global_inventory 
                     SET num_{color}_ml = num_{color}_ml - {ml_used[color]}
@@ -57,7 +57,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
 @router.post("/bottler/plan")
 def get_bottle_plan():
     print("DEBUG: GETBOTTLEPLAN")
-    # Fetch the current volume of potion ml for all colors
+    # fetch poitions ml from inventory
     sql_query = "SELECT num_green_ml, num_red_ml, num_blue_ml FROM global_inventory"
     with db.engine.begin() as connection:
         result = connection.execute(sqlalchemy.text(sql_query))
@@ -69,10 +69,9 @@ def get_bottle_plan():
 
     num_green_ml, num_red_ml, num_blue_ml = inventory_data
     
-    # Initialize the response list
     bottle_plan = []
     
-    # Calculate how many bottles can be made for each potion type and add them if they are greater than zero
+    # calc how many bottles can be made per potion
     potions_to_bottle_green = num_green_ml // 100
     if potions_to_bottle_green > 0:
         bottle_plan.append({"potion_type": [0, 100, 0, 0], "quantity": potions_to_bottle_green})
