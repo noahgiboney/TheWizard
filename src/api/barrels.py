@@ -60,6 +60,10 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     print(f"Barrels delivered: {barrels_delivered}, Order ID: {order_id}")
     return {"status": "success", "message": "Delivery processed and inventory updated"}
 
+class Purchase(BaseModel):
+    sku: str
+    quantity: int
+
 #Gets called once a day 
 @router.post("/plan")
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
@@ -74,23 +78,16 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         return []
 
     gold = gold_data[0]
-
     purchase_plan = []
 
-    # iterate catalog and find out how many of each barrel can be purchased with the available gold
+    # iterate catalog and 
     for barrel in wholesale_catalog:
         if gold < barrel.price:
-            continue # not enough gold to buy one barrel
+            continue  # not enough gold to buy even one barrel
 
-       # check barrels
-        if "SMALL_GREEN" in barrel.sku or "SMALL_RED" in barrel.sku or "SMALL_BLUE" in barrel.sku:
-            barrels_affordable = min(gold // barrel.price, barrel.quantity)
-
-            if barrels_affordable > 0:
-                purchase_plan.append({
-                    "sku": barrel.sku,
-                    "quantity": barrels_affordable
-                })
-                gold -= barrels_affordable * barrel.price  # ipdate remaining gold after purchase
+        max_purchaseable = min(gold // barrel.price, barrel.quantity)
+        if max_purchaseable > 0:
+            purchase_plan.append(Purchase(sku=barrel.sku, quantity=max_purchaseable))
+            gold -= max_purchaseable * barrel.price  # update remaining gold after purchase
 
     return purchase_plan
