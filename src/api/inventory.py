@@ -13,8 +13,9 @@ router = APIRouter(
 )
 
 @router.get("/audit")
-def get_inventory():
-    # Fetch the full inventory, including all potion types and their corresponding ml
+def get_inventory_summary():
+    
+    #fetch the full inventory
     sql_query = """
     SELECT num_green_potions, num_green_ml, num_red_potions, num_red_ml, num_blue_potions, num_blue_ml, gold
     FROM global_inventory;
@@ -26,20 +27,14 @@ def get_inventory():
     if inventory_data is None:
         raise HTTPException(status_code=404, detail="Inventory not found.")
     
+    total_potions = inventory_data[0] + inventory_data[2] + inventory_data[4]
+    total_ml = inventory_data[1] + inventory_data[3] + inventory_data[5]
+    total_gold = inventory_data[6]
+
     return {
-        "green_potions": {
-            "number_of_potions": inventory_data[0],
-            "ml_in_barrels": inventory_data[1]
-        },
-        "red_potions": {
-            "number_of_potions": inventory_data[2],
-            "ml_in_barrels": inventory_data[3]
-        },
-        "blue_potions": {
-            "number_of_potions": inventory_data[4],
-            "ml_in_barrels": inventory_data[5]
-        },
-        "gold": inventory_data[6]
+        "number_of_potions": total_potions,
+        "ml_in_barrels": total_ml,
+        "gold": total_gold
     }
 
 # Gets called once a day
