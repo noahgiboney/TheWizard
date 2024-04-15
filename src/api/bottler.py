@@ -63,21 +63,29 @@ def get_bottle_plan():
         result = connection.execute(sqlalchemy.text(sql_query))
         inventory_data = result.fetchone()
     print(inventory_data)
+
     if not inventory_data:
         raise HTTPException(status_code=404, detail="Inventory data not found.")
 
     num_green_ml, num_red_ml, num_blue_ml = inventory_data
     
-    # Calculate how many bottles for each potion type
+    # Initialize the response list
+    bottle_plan = []
+    
+    # Calculate how many bottles can be made for each potion type and add them if they are greater than zero
     potions_to_bottle_green = num_green_ml // 100
-    potions_to_bottle_red = num_red_ml // 100
-    potions_to_bottle_blue = num_blue_ml // 100
+    if potions_to_bottle_green > 0:
+        bottle_plan.append({"potion_type": [0, 100, 0, 0], "quantity": potions_to_bottle_green})
 
-    return [
-        {"potion_type": [0, 100, 0, 0], "quantity": potions_to_bottle_green}, 
-        {"potion_type": [100, 0, 0, 0], "quantity": potions_to_bottle_red},
-        {"potion_type": [0, 0, 100, 0], "quantity": potions_to_bottle_blue}
-    ]
+    potions_to_bottle_red = num_red_ml // 100
+    if potions_to_bottle_red > 0:
+        bottle_plan.append({"potion_type": [100, 0, 0, 0], "quantity": potions_to_bottle_red})
+
+    potions_to_bottle_blue = num_blue_ml // 100
+    if potions_to_bottle_blue > 0:
+        bottle_plan.append({"potion_type": [0, 0, 100, 0], "quantity": potions_to_bottle_blue})
+
+    return bottle_plan
 
 if __name__ == "__main__":
     print(get_bottle_plan())
