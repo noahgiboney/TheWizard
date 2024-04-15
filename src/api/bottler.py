@@ -17,6 +17,7 @@ class PotionInventory(BaseModel):
 
 @router.post("/deliver/{order_id}")
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
+    print(f"DEBUG POSTDELIVERBOTTLES: {potions_delivered}")
     # calculate quantities delivered for each potion type
     potion_quantities = {
         "green": sum(potion.quantity for potion in potions_delivered if potion.potion_type == [0, 100, 0, 0]),
@@ -54,6 +55,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
 
 @router.post("/plan")
 def get_bottle_plan():
+    print("DEBUG: GETBOTTLEPLAN")
     # fetch the current volume of potion ml for all colors
     sql_query = "SELECT num_green_ml, num_red_ml, num_blue_ml FROM global_inventory"
     with db.engine.begin() as connection:

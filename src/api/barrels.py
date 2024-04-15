@@ -21,6 +21,7 @@ class Barrel(BaseModel):
 
 @router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
+    print(f"DEBUG POST DELIVER BARRELS: {barrels_delivered} {order_id}")
     # dictionary to track total ml added and total cost for each potion type
     potion_totals = {
         "green": {"ml": 0, "cost": 0},
@@ -62,6 +63,7 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
 #Gets called once a day 
 @router.post("/plan")
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
+    print(f"DEBUG GETWHOLESALEPURCHASE: {wholesale_catalog}")
     # Fetch current gold amount from inventory
     with db.engine.connect() as connection:
         result = connection.execute(sqlalchemy.text("SELECT gold FROM global_inventory"))

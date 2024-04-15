@@ -106,6 +106,8 @@ class CartCheckout(BaseModel):
 
 @router.post("/{cart_id}/checkout")
 def checkout(cart_id: int, cart_checkout: CartCheckout):
+    print(f"DEBUG CHECKOUT: {cart_id} {cart_checkout}")
+
     # Hardcoding potion prices and types
     potion_details = {
         "green": {"price": 50},

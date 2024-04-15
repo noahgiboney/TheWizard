@@ -9,6 +9,7 @@ router = APIRouter()
 
 @router.get("/catalog/", tags=["catalog"])
 def get_catalog():
+    print(f"DEBUG CATALOG")
     # Updated SQL to fetch inventory details for all potion types
     sql_to_execute = """
     SELECT num_green_potions, num_green_ml, num_red_potions, num_red_ml, num_blue_potions, num_blue_ml, gold
