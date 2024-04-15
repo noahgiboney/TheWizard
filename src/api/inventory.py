@@ -14,19 +14,32 @@ router = APIRouter(
 
 @router.get("/audit")
 def get_inventory():
-    # fetch the inventory
+    # Fetch the full inventory, including all potion types and their corresponding ml
+    sql_query = """
+    SELECT num_green_potions, num_green_ml, num_red_potions, num_red_ml, num_blue_potions, num_blue_ml, gold
+    FROM global_inventory;
+    """
     with db.engine.connect() as connection:
-        result = connection.execute(sqlalchemy.text("SELECT num_green_potions, num_green_ml, gold FROM global_inventory"))
+        result = connection.execute(sqlalchemy.text(sql_query))
         inventory_data = result.fetchone()
 
     if inventory_data is None:
         raise HTTPException(status_code=404, detail="Inventory not found.")
-
-    # fetched inventory data
+    
     return {
-        "number_of_potions": inventory_data[0],  
-        "ml_in_barrels": inventory_data[1],     
-        "gold": inventory_data[2]           
+        "green_potions": {
+            "number_of_potions": inventory_data[0],
+            "ml_in_barrels": inventory_data[1]
+        },
+        "red_potions": {
+            "number_of_potions": inventory_data[2],
+            "ml_in_barrels": inventory_data[3]
+        },
+        "blue_potions": {
+            "number_of_potions": inventory_data[4],
+            "ml_in_barrels": inventory_data[5]
+        },
+        "gold": inventory_data[6]
     }
 
 # Gets called once a day

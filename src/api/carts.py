@@ -94,7 +94,6 @@ def create_cart(new_cart: Customer):
 class CartItem(BaseModel):
     quantity: int
 
-
 @router.post("/{cart_id}/items/{item_sku}")
 def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
     """ """
@@ -103,24 +102,57 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
 
 
 class CartCheckout(BaseModel):
-    payment: str
+    payment: str     
 
-#sell only one green bottle
 @router.post("/{cart_id}/checkout")
 def checkout(cart_id: int, cart_checkout: CartCheckout):
-    
-    # get inventory on green bottles
+    # Hardcoding potion prices and types
+    potion_details = {
+        "green": {"price": 50},
+        "red": {"price": 75},
+        "blue": {"price": 100}
+    }
+
+    # Get current inventory for all potions
     with db.engine.connect() as connection:
-        result = connection.execute(sqlalchemy.text("SELECT num_green_potions FROM global_inventory"))
+        sql_query = """
+        SELECT num_green_potions, num_red_potions, num_blue_potions
+        FROM global_inventory
+        WHERE num_green_potions > 0 OR num_red_potions > 0 OR num_blue_potions > 0;
+        """
+        result = connection.execute(sqlalchemy.text(sql_query))
         inventory_data = result.fetchone()
 
-    if inventory_data is None or inventory_data[0] < 1:
-        raise HTTPException(status_code=400, detail="NO GREEN POTIONS")
+    # Handle no inventory data
+    if not inventory_data:
+        raise HTTPException(status_code=400, detail="Insufficient potion inventory available")
 
-    # sell the potion
+    num_green_potions, num_red_potions, num_blue_potions = inventory_data
+
+    if num_green_potions < 1 or num_red_potions < 1 or num_blue_potions < 1:
+        raise HTTPException(status_code=400, detail="Not all potion types are available for checkout")
+
+    # Proceed with selling one of each type of potion
     with db.engine.begin() as connection:
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET num_green_potions = num_green_potions - 1"))
-        # add 50 to db
-        connection.execute(sqlalchemy.text("UPDATE global_inventory SET gold = gold + 50"))
+        total_gold_paid = 0
+        for potion_type, details in potion_details.items():
+            # Update potion count for each type
+            connection.execute(
+                sqlalchemy.text(
+                    f"UPDATE global_inventory SET num_{potion_type}_potions = num_{potion_type}_potions - 1"
+                )
+            )
+            # total gold paid
+            total_gold_paid += details["price"]
+        
+        # update gold amount by adding the total potion prices
+        connection.execute(
+            sqlalchemy.text(
+                "UPDATE global_inventory SET gold = gold + {}"
+            ), {'total_price': total_gold_paid}
+        )
 
-    return {"total_potions_bought": 1, "total_gold_paid": 50}
+    return {
+        "total_potions_bought": {"green": 1, "red": 1, "blue": 1},
+        "total_gold_paid": total_gold_paid
+    }

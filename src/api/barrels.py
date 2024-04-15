@@ -21,31 +21,48 @@ class Barrel(BaseModel):
 
 @router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
-    # total md in barrel delivered
-    total_ml_added = sum(barrel.ml_per_barrel * barrel.quantity for barrel in barrels_delivered if barrel.potion_type == [0, 100, 0, 0])
-    
-    # calculate total cost of barrels
-    total_cost = sum(barrel.price * barrel.quantity for barrel in barrels_delivered if barrel.potion_type == [0, 100, 0, 0])
-    print(total_cost)
-    
-    if total_ml_added > 0:
-        with db.engine.begin() as connection:
-            # add ml from the barrel to the db
-            sql_update_ml = "UPDATE global_inventory SET num_green_ml = num_green_ml + :ml_added"
-            connection.execute(sqlalchemy.text(sql_update_ml), {"ml_added": total_ml_added})
-            
-            # subtract the gold from the db
-            if total_cost > 0:  
-                sql_update_gold = "UPDATE global_inventory SET gold = gold - :cost"
-                connection.execute(sqlalchemy.text(sql_update_gold), {"cost": total_cost})
+    # dictionary to track total ml added and total cost for each potion type
+    potion_totals = {
+        "green": {"ml": 0, "cost": 0},
+        "red": {"ml": 0, "cost": 0},
+        "blue": {"ml": 0, "cost": 0}
+    }
+
+    # rgb map of potions 
+    potion_color_map = {
+        (0, 100, 0): "green",
+        (100, 0, 0): "red",
+        (0, 0, 100): "blue"
+    }
+
+    # calculate totals for each barrel delivered
+    for barrel in barrels_delivered:
+        potion_type = tuple(barrel.potion_type)
+        if potion_type in potion_color_map:
+            color = potion_color_map[potion_type]
+            potion_totals[color]["ml"] += barrel.ml_per_barrel * barrel.quantity
+            potion_totals[color]["cost"] += barrel.price * barrel.quantity
+
+    # update the database for each potion type
+    with db.engine.begin() as connection:
+        for color, totals in potion_totals.items():
+            if totals["ml"] > 0:
+                # add ml from the barrels to the database
+                sql_update_ml = f"UPDATE global_inventory SET num_{color}_ml = num_{color}_ml + :ml_added"
+                connection.execute(sqlalchemy.text(sql_update_ml), {"ml_added": totals["ml"]})
+
+                # subtract the cost from the gold in the database
+                if totals["cost"] > 0:
+                    sql_update_gold = "UPDATE global_inventory SET gold = gold - :cost"
+                    connection.execute(sqlalchemy.text(sql_update_gold), {"cost": totals["cost"]})
 
     print(f"Barrels delivered: {barrels_delivered}, Order ID: {order_id}")
-    return "OK"
+    return {"status": "success", "message": "Delivery processed and inventory updated"}
 
-# Gets called once a day
+#Gets called once a day 
 @router.post("/plan")
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
-    # fetch current gold amount from inventory
+    # Fetch current gold amount from inventory
     with db.engine.connect() as connection:
         result = connection.execute(sqlalchemy.text("SELECT gold FROM global_inventory"))
         gold_data = result.fetchone()
@@ -58,10 +75,13 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
 
     purchase_plan = []
 
-    # go over catalog and find out how many to purchase
+    # iterate catalog and find out how many of each barrel can be purchased with the available gold
     for barrel in wholesale_catalog:
-        if "SMALL_GREEN" in barrel.sku and barrel.price <= gold:
-            # how many of such barrels can be purchased with the available gold
+        if gold < barrel.price:
+            continue # not enough gold to buy one barrel
+
+       # check barrels
+        if "SMALL_GREEN" in barrel.sku or "SMALL_RED" in barrel.sku or "SMALL_BLUE" in barrel.sku:
             barrels_affordable = min(gold // barrel.price, barrel.quantity)
 
             if barrels_affordable > 0:
@@ -69,7 +89,6 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                     "sku": barrel.sku,
                     "quantity": barrels_affordable
                 })
-                gold -= barrels_affordable * barrel.price
-                break
+                gold -= barrels_affordable * barrel.price  # ipdate remaining gold after purchase
 
     return purchase_plan
