@@ -5,6 +5,7 @@ from enum import Enum
 import sqlalchemy
 from src import database as db
 from fastapi import HTTPException
+import uuid
 
 router = APIRouter(
     prefix="/carts",
@@ -84,11 +85,18 @@ def post_visits(visit_id: int, customers: list[Customer]):
 
     return "OK"
 
+carts = {}
 
 @router.post("/")
 def create_cart(new_cart: Customer):
-    """ """
-    return {"cart_id": 1}
+    """Create a new cart with a unique identifier for a specific customer."""
+    cart_id = str(uuid.uuid4())  # Generate a unique identifier for the cart
+    # Store the cart with customer details and an initially empty dictionary of items
+    carts[cart_id] = {
+        "customer": new_cart.dict(),
+        "items": {}
+    }
+    return {"cart_id": cart_id}  # Respond with only the cart_id as per API spec
 
 
 class CartItem(BaseModel):
@@ -96,9 +104,15 @@ class CartItem(BaseModel):
 
 @router.post("/{cart_id}/items/{item_sku}")
 def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
-    """ """
-
-    return "OK"
+    """Update the quantity of an item in the cart."""
+    if cart_id not in carts:
+        return {"success": False}
+    
+    if "items" not in carts[cart_id]:
+        carts[cart_id]["items"] = {}
+    
+    carts[cart_id]["items"][item_sku] = cart_item.quantity
+    return {"success": True}
 
 
 class CartCheckout(BaseModel):
@@ -110,8 +124,8 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
 
     # Hardcoding potion prices and types
     potion_details = {
-        "green": {"price": 50},
-        "red": {"price": 75},
+        "green": {"price": 100},
+        "red": {"price": 100},
         "blue": {"price": 100}
     }
 
