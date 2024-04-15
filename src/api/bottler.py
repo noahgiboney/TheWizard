@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from src.api import auth
 import sqlalchemy
 from src import database as db
+from fastapi import HTTPException
 
 router = APIRouter(
     prefix="/bottler",
@@ -53,28 +54,27 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     print(f"Potions delivered: {potions_delivered}, Order ID: {order_id}")
     return {"status": "success", "message": "Delivery processed successfully"}
 
-@router.post("/plan")
+@router.post("/bottler/plan")
 def get_bottle_plan():
     print("DEBUG: GETBOTTLEPLAN")
-    # fetch the current volume of potion ml for all colors
+    # Fetch the current volume of potion ml for all colors
     sql_query = "SELECT num_green_ml, num_red_ml, num_blue_ml FROM global_inventory"
     with db.engine.begin() as connection:
         result = connection.execute(sqlalchemy.text(sql_query))
         inventory_data = result.fetchone()
-    
+    print(inventory_data)
     if not inventory_data:
-        print("Inventory data not found.")
-        return {"error": "Inventory data not found."}
+        raise HTTPException(status_code=404, detail="Inventory data not found.")
 
     num_green_ml, num_red_ml, num_blue_ml = inventory_data
     
-    # calculate how many bottles for each potion type
+    # Calculate how many bottles for each potion type
     potions_to_bottle_green = num_green_ml // 100
     potions_to_bottle_red = num_red_ml // 100
     potions_to_bottle_blue = num_blue_ml // 100
 
     return [
-        {"potion_type": [0, 100, 0, 0], "quantity": potions_to_bottle_green},
+        {"potion_type": [0, 100, 0, 0], "quantity": potions_to_bottle_green},  # Presuming the potion_type format is [r, g, b, d]
         {"potion_type": [100, 0, 0, 0], "quantity": potions_to_bottle_red},
         {"potion_type": [0, 0, 100, 0], "quantity": potions_to_bottle_blue}
     ]
