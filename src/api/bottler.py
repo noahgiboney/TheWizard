@@ -74,7 +74,7 @@ def get_bottle_plan():
     potions_to_bottle_blue = num_blue_ml // 100
 
     return [
-        {"potion_type": [0, 100, 0, 0], "quantity": potions_to_bottle_green},  # Presuming the potion_type format is [r, g, b, d]
+        {"potion_type": [0, 100, 0, 0], "quantity": potions_to_bottle_green}, 
         {"potion_type": [100, 0, 0, 0], "quantity": potions_to_bottle_red},
         {"potion_type": [0, 0, 100, 0], "quantity": potions_to_bottle_blue}
     ]
