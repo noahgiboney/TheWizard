@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from src.api import auth
 import sqlalchemy
 from src import database as db
+from fastapi import HTTPException
 
 router = APIRouter(
     prefix="/barrels",
@@ -12,31 +13,29 @@ router = APIRouter(
 
 class Barrel(BaseModel):
     sku: str
-
     ml_per_barrel: int
     potion_type: list[int]
     price: int
-
     quantity: int
 
-@router.post("/deliver/{order_id}")
+@router.post("/deliver/{order_id}", response_model=dict)
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     print(f"DEBUG POST DELIVER BARRELS: {barrels_delivered} {order_id}")
-    # dictionary to track total ml added and total cost for each potion type
+    # Dictionary to track total ml added and total cost for each potion type
     potion_totals = {
         "green": {"ml": 0, "cost": 0},
         "red": {"ml": 0, "cost": 0},
         "blue": {"ml": 0, "cost": 0}
     }
 
-    # rgb map of potions 
+    # RGB map of potions as a dictionary mapping tuple to color string
     potion_color_map = {
-        (0, 100, 0): "green",
-        (100, 0, 0): "red",
-        (0, 0, 100): "blue"
+        (0, 100, 0, 0): "green",
+        (100, 0, 0, 0): "red",
+        (0, 0, 100, 0): "blue"
     }
 
-    # calculate totals for each barrel delivered
+    # Calculate totals for each barrel delivered
     for barrel in barrels_delivered:
         potion_type = tuple(barrel.potion_type)
         if potion_type in potion_color_map:
@@ -44,22 +43,24 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
             potion_totals[color]["ml"] += barrel.ml_per_barrel * barrel.quantity
             potion_totals[color]["cost"] += barrel.price * barrel.quantity
 
-    # update the database for each potion type
-    with db.engine.begin() as connection:
-        for color, totals in potion_totals.items():
-            if totals["ml"] > 0:
-                # add ml from the barrels to the database
-                sql_update_ml = f"UPDATE global_inventory SET num_{color}_ml = num_{color}_ml + :ml_added"
-                connection.execute(sqlalchemy.text(sql_update_ml), {"ml_added": totals["ml"]})
+    # Update the database for each potion type
+    try:
+        with db.engine.begin() as connection:
+            for color, totals in potion_totals.items():
+                if totals["ml"] > 0:
+                    # Add ml from the barrels to the database
+                    sql_update_ml = f"UPDATE global_inventory SET num_{color}_ml = num_{color}_ml + :ml_added"
+                    connection.execute(sqlalchemy.text(sql_update_ml), {"ml_added": totals["ml"]})
 
-                # subtract the cost from the gold in the database
+                # Subtract the cost from the gold in the database
                 if totals["cost"] > 0:
                     sql_update_gold = "UPDATE global_inventory SET gold = gold - :cost"
                     connection.execute(sqlalchemy.text(sql_update_gold), {"cost": totals["cost"]})
+    except Exception as e:
+        print(f"Error updating database: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during database update")
 
-    print(f"Barrels delivered: {barrels_delivered}, Order ID: {order_id}")
     return {"status": "success", "message": "Delivery processed and inventory updated"}
-
 class Purchase(BaseModel):
     sku: str
     quantity: int
