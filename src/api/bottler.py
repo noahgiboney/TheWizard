@@ -69,6 +69,7 @@ def get_bottle_plan():
     
     bottle_plan = []
     
+    
     # calc how many bottles can be made per potion
     potions_to_bottle_green = num_green_ml // 100
     if potions_to_bottle_green > 0:
