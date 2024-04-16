@@ -28,8 +28,8 @@ def validate_potion_type(potion_type):
 @router.get("/catalog/", tags=["catalog"])
 def get_catalog():
     print("DEBUG CATALOG")
-    # SQL to fetch inventory details for all potion types
-    sql_to_execute = """
+    # fetch sql
+    sql = """
     SELECT num_green_potions, num_red_potions, num_blue_potions
     FROM global_inventory;
     """
@@ -37,7 +37,7 @@ def get_catalog():
     potions_for_sale = []
 
     with db.engine.connect() as connection:
-        result = connection.execute(sqlalchemy.text(sql_to_execute))
+        result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
         print(inventory_data)
 
@@ -46,6 +46,7 @@ def get_catalog():
 
         num_green_potions, num_red_potions, num_blue_potions = inventory_data
 
+        # for now only seel r g b potions
         if num_green_potions > 0:
             try:
                 validate_sku("GREEN_POTION_1")

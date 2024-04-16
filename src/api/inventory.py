@@ -16,12 +16,12 @@ router = APIRouter(
 def get_inventory_summary():
     
     #fetch the full inventory
-    sql_query = """
+    sql = """
     SELECT num_green_potions, num_green_ml, num_red_potions, num_red_ml, num_blue_potions, num_blue_ml, gold
     FROM global_inventory;
     """
     with db.engine.connect() as connection:
-        result = connection.execute(sqlalchemy.text(sql_query))
+        result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
 
     if inventory_data is None:

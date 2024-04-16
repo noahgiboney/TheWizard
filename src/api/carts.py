@@ -5,7 +5,6 @@ from enum import Enum
 import sqlalchemy
 from src import database as db
 from fastapi import HTTPException
-import uuid
 
 router = APIRouter(
     prefix="/carts",
@@ -91,16 +90,17 @@ cart_id_counter = 0
 @router.post("/")
 def create_cart(new_cart: Customer):
     """Create a new cart with a unique identifier for a specific customer."""
-    global cart_id_counter  # Use the global variable to keep track of the last used ID
-    cart_id_counter += 1  # Increment the cart ID counter to get a new unique ID
-    cart_id = cart_id_counter  # Use the incremented counter as the new cart ID
+    # generate a new card id for a new customer
+    global cart_id_counter  
+    cart_id_counter += 1  
+    cart_id = cart_id_counter  
 
-    # Store the cart with customer details and an initially empty dictionary of items
+    # update cart dic with new cart
     carts[cart_id] = {
         "customer": new_cart.dict(),
         "items": {}
     }
-    return {"cart_id": cart_id}  # Respond with only the cart_id as per API spec
+    return {"cart_id": cart_id}  
 
 
 class CartItem(BaseModel):
@@ -126,24 +126,22 @@ class CartCheckout(BaseModel):
 def checkout(cart_id: int, cart_checkout: CartCheckout):
     print(f"DEBUG CHECKOUT: {cart_id} {cart_checkout}")
 
-    # Hardcoding potion prices and types
     potion_details = {
         "green": {"price": 100},
         "red": {"price": 100},
         "blue": {"price": 100}
     }
 
-    # Get current inventory for all potions
+    # get all potions 
     with db.engine.connect() as connection:
-        sql_query = """
+        sql = """
         SELECT num_green_potions, num_red_potions, num_blue_potions
         FROM global_inventory
         WHERE num_green_potions > 0 OR num_red_potions > 0 OR num_blue_potions > 0;
         """
-        result = connection.execute(sqlalchemy.text(sql_query))
+        result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
 
-    # Handle no inventory data
     if not inventory_data:
         raise HTTPException(status_code=400, detail="Insufficient potion inventory available")
 
@@ -152,11 +150,11 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     if num_green_potions < 1 or num_red_potions < 1 or num_blue_potions < 1:
         raise HTTPException(status_code=400, detail="Not all potion types are available for checkout")
 
-    # Proceed with selling one of each type of potion
+    total_potions = 0 
+    total_gold_paid = 0  
+
     with db.engine.begin() as connection:
-        total_gold_paid = 0
         for potion_type, details in potion_details.items():
-            # Update potion count for each type
             connection.execute(
                 sqlalchemy.text(
                     f"UPDATE global_inventory SET num_{potion_type}_potions = num_{potion_type}_potions - 1"
@@ -164,15 +162,16 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             )
             # total gold paid
             total_gold_paid += details["price"]
-        
+            total_potions += 1  # Increment total potion count
+
         # update gold amount by adding the total potion prices
         connection.execute(
             sqlalchemy.text(
-                "UPDATE global_inventory SET gold = gold + {}"
-            ), {'total_price': total_gold_paid}
+                f"UPDATE global_inventory SET gold = gold + {total_gold_paid}"
+            )
         )
 
     return {
-        "total_potions_bought": {"green": 1, "red": 1, "blue": 1},
+        "total_potions_bought": total_potions,
         "total_gold_paid": total_gold_paid
     }
