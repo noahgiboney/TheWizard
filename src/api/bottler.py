@@ -65,9 +65,7 @@ def get_bottle_plan():
         inventory_data = result.fetchone()
 
     print(f"DEBUG: {inventory_data}")
-    if not inventory_data:
-        raise HTTPException(status_code=404, detail="Inventory data not found.")
-
+    
     num_green_ml, num_red_ml, num_blue_ml = inventory_data
     
     bottle_plan = []
