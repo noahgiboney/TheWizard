@@ -58,12 +58,12 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
 def get_bottle_plan():
     print("DEBUG: GETBOTTLEPLAN")
     # fetch poitions ml from inventory
-    sql_query = "SELECT num_green_ml, num_red_ml, num_blue_ml FROM global_inventory"
     with db.engine.begin() as connection:
+        sql_query = "SELECT num_green_ml, num_red_ml, num_blue_ml FROM global_inventory"
         result = connection.execute(sqlalchemy.text(sql_query))
         inventory_data = result.fetchone()
-    print(inventory_data)
 
+    print(f"DEBUG: {inventory_data}")
     if not inventory_data:
         raise HTTPException(status_code=404, detail="Inventory data not found.")
 
