@@ -24,7 +24,6 @@ def reset():
         num_blue_potions = 0, num_blue_ml = 0,
         gold = 100;
         """
-
         connection.execute(sqlalchemy.text(sql_to_execute))
         connection.commit()
     return "OK"

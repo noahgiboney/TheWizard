@@ -57,6 +57,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
 @router.post("/bottler/plan")
 def get_bottle_plan():
     print("DEBUG: GETBOTTLEPLAN")
+    connection.commit()
     # fetch poitions ml from inventory
     with db.engine.begin() as connection:
         sql_query = "SELECT num_green_ml, num_red_ml, num_blue_ml FROM global_inventory"
