@@ -30,7 +30,7 @@ def get_inventory_summary():
     total_potions = inventory_data[0] + inventory_data[2] + inventory_data[4]
     total_ml = inventory_data[1] + inventory_data[3] + inventory_data[5]
     total_gold = inventory_data[6]
-
+    print(f"DEBUG TOTAL POTIONS AUDIT: {total_potions} {total_ml} {total_gold}")
     return {
         "number_of_potions": total_potions,
         "ml_in_barrels": total_ml,

@@ -18,7 +18,7 @@ class Barrel(BaseModel):
     price: int
     quantity: int
 
-@router.post("/deliver/{order_id}", response_model=dict)
+@router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     print(f"DEBUG POST DELIVER BARRELS: {barrels_delivered} {order_id}")
     # dictionary to track total ml for barrles and total cost for each potion type
@@ -48,18 +48,19 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
             for color, totals in potion_totals.items():
                 if totals["ml"] > 0:
                     # add ml to db
-                    sql = f"UPDATE global_inventory SET num_{color}_ml = num_{color}_ml + :ml_added"
-                    connection.execute(sqlalchemy.text(sql), {"ml_added": totals["ml"]})
+                    sql = f"UPDATE global_inventory SET num_{color}_ml = num_{color}_ml + {totals["ml"]}"
+                    connection.execute(sqlalchemy.text(sql))
 
                 # subtract gold in db
                 if totals["cost"] > 0:
-                    sql_update_gold = "UPDATE global_inventory SET gold = gold - :cost"
-                    connection.execute(sqlalchemy.text(sql_update_gold), {"cost": totals["cost"]})
+                    sql_update_gold = f"UPDATE global_inventory SET gold = gold - {totals["cost"]}"
+                    connection.execute(sqlalchemy.text(sql_update_gold))
     except Exception as e:
         print(f"Error updating database: {e}")
         raise HTTPException(status_code=500, detail="Internal server error during database update")
 
     return {"status": "success", "message": "Delivery processed and inventory updated"}
+
 class Purchase(BaseModel):
     sku: str
     quantity: int
