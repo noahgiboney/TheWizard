@@ -18,6 +18,7 @@ class Barrel(BaseModel):
     price: int
     quantity: int
 
+@router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     print(f"DEBUG POST DELIVER BARRELS: {barrels_delivered} {order_id}")
     # dictionary to track total ml for barrels and total cost for each potion type
@@ -29,7 +30,7 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
 
     potion_color_map = {
         (0, 1, 0, 0): "green",
-        (1, 0, 0, 0): "red", 
+        (1, 0, 0, 0): "red",  
         (0, 0, 1, 0): "blue"
     }
 
