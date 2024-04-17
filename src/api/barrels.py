@@ -18,10 +18,9 @@ class Barrel(BaseModel):
     price: int
     quantity: int
 
-@router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     print(f"DEBUG POST DELIVER BARRELS: {barrels_delivered} {order_id}")
-    # dictionary to track total ml for barrles and total cost for each potion type
+    # dictionary to track total ml for barrels and total cost for each potion type
     potion_totals = {
         "green": {"ml": 0, "cost": 0},
         "red": {"ml": 0, "cost": 0},
@@ -29,9 +28,9 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     }
 
     potion_color_map = {
-        (0, 100, 0, 0): "green",
-        (100, 0, 0, 0): "red",
-        (0, 0, 100, 0): "blue"
+        (0, 1, 0, 0): "green",
+        (1, 0, 0, 0): "red", 
+        (0, 0, 1, 0): "blue"
     }
 
     # totals for each barrel delivered
@@ -42,22 +41,22 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
             potion_totals[color]["ml"] += barrel.ml_per_barrel * barrel.quantity
             potion_totals[color]["cost"] += barrel.price * barrel.quantity
 
-    # update db for each potion type 
-    try:
-        with db.engine.begin() as connection:
-            for color, totals in potion_totals.items():
-                if totals["ml"] > 0:
-                    # add ml to db
-                    sql = f"UPDATE global_inventory SET num_{color}_ml = num_{color}_ml + {totals["ml"]}"
-                    connection.execute(sqlalchemy.text(sql))
+    # update db for each potion type
+    with db.engine.begin() as connection:
+        for color, totals in potion_totals.items():
+            if totals["ml"] > 0:
+                # add ml to db
+                sql_update_ml = sqlalchemy.text(
+                    f"UPDATE global_inventory SET num_{color}_ml = num_{color}_ml + :ml_added"
+                )
+                connection.execute(sql_update_ml, {"ml_added": totals["ml"]})
 
+            if totals["cost"] > 0:
                 # subtract gold in db
-                if totals["cost"] > 0:
-                    sql_update_gold = f"UPDATE global_inventory SET gold = gold - {totals["cost"]}"
-                    connection.execute(sqlalchemy.text(sql_update_gold))
-    except Exception as e:
-        print(f"Error updating database: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error during database update")
+                sql_update_gold = sqlalchemy.text(
+                    "UPDATE global_inventory SET gold = gold - :cost"
+                )
+                connection.execute(sql_update_gold, {"cost": totals["cost"]})
 
     return {"status": "success", "message": "Delivery processed and inventory updated"}
 
