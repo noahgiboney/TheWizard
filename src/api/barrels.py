@@ -79,8 +79,9 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         print("No gold data found.")
         return []
 
-    print(f"debug {gold_data}")
+    
     gold = gold_data[0]
+    print(f"debug {gold}")
     purchase_plan = []
 
     # iterate catalog
