@@ -79,6 +79,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         print("No gold data found.")
         return []
 
+    print(f"debug {gold_data}")
     gold = gold_data[0]
     purchase_plan = []
 
@@ -88,6 +89,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
             continue  # not enough gold to buy even one barrel
 
         max_purchaseable = min(gold // barrel.price, barrel.quantity)
+        print(f"debug {max_purchaseable}")
         if max_purchaseable > 0:
             purchase_plan.append(Purchase(sku=barrel.sku, quantity=max_purchaseable))
             gold -= max_purchaseable * barrel.price  # update remaining gold after purchase
