@@ -44,6 +44,7 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
 
     # update db for each potion type
     with db.engine.begin() as connection:
+        print("DEBUG in connectoin")
         for color, totals in potion_totals.items():
             if totals["ml"] > 0:
                 # add ml to db
