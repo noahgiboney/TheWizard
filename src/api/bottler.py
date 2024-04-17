@@ -54,7 +54,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     print(f"Potions delivered: {potions_delivered}, Order ID: {order_id}")
     return {"status": "success", "message": "Delivery processed successfully"}
 
-@router.post("/bottler/plan")
+@router.post("/plan")
 def get_bottle_plan():
     print("DEBUG: GETBOTTLEPLAN")
     # fetch poitions ml from inventory
@@ -68,7 +68,6 @@ def get_bottle_plan():
     num_green_ml, num_red_ml, num_blue_ml = inventory_data
     
     bottle_plan = []
-    
     
     # calc how many bottles can be made per potion
     potions_to_bottle_green = num_green_ml // 100
