@@ -17,7 +17,6 @@ def reset():
     and all barrels are removed from inventory. Carts are all reset.
     """
     
-    
     with db.engine.connect() as connection:
         sql_to_execute = """
         UPDATE global_inventory

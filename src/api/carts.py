@@ -132,39 +132,51 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         "blue": {"price": 100}
     }
 
-    # get all potions 
+    # Get all potions 
     with db.engine.connect() as connection:
         sql = """
         SELECT num_green_potions, num_red_potions, num_blue_potions
-        FROM global_inventory
-        WHERE num_green_potions > 0 OR num_red_potions > 0 OR num_blue_potions > 0;
+        FROM global_inventory;
         """
         result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
 
     if not inventory_data:
-        raise HTTPException(status_code=400, detail="Insufficient potion inventory available")
+        raise HTTPException(status_code=400, detail="No potion inventory available")
 
     num_green_potions, num_red_potions, num_blue_potions = inventory_data
-
-    if num_green_potions < 1 or num_red_potions < 1 or num_blue_potions < 1:
-        raise HTTPException(status_code=400, detail="Not all potion types are available for checkout")
-
     total_potions = 0 
     total_gold_paid = 0  
 
-    with db.engine.begin() as connection:
-        for potion_type, details in potion_details.items():
-            connection.execute(
-                sqlalchemy.text(
-                    f"UPDATE global_inventory SET num_{potion_type}_potions = num_{potion_type}_potions - 1"
-                )
-            )
-            # total gold paid
-            total_gold_paid += details["price"]
-            total_potions += 1  # Increment total potion count
+    # Prepare to track requested potions and validate inventory
+    requested_potions = {
+        "green": cart_checkout.num_green_potions,
+        "red": cart_checkout.num_red_potions,
+        "blue": cart_checkout.num_blue_potions
+    }
 
-        # update gold amount by adding the total potion prices
+    available_potions = {
+        "green": num_green_potions,
+        "red": num_red_potions,
+        "blue": num_blue_potions
+    }
+
+    with db.engine.begin() as connection:
+        for potion_type, requested_count in requested_potions.items():
+            if requested_count > 0 and available_potions[potion_type] >= requested_count:
+                # Update inventory only if enough stock is available
+                connection.execute(
+                    sqlalchemy.text(
+                        f"UPDATE global_inventory SET num_{potion_type}_potions = num_{potion_type}_potions - {requested_count}"
+                    )
+                )
+                # total gold paid
+                total_gold_paid += potion_details[potion_type]["price"] * requested_count
+                total_potions += requested_count  # Increment total potion count
+            elif requested_count > 0:
+                print(f"Not enough {potion_type} potions available.")
+
+        # Update gold amount by adding the total potion prices
         connection.execute(
             sqlalchemy.text(
                 f"UPDATE global_inventory SET gold = gold + {total_gold_paid}"
