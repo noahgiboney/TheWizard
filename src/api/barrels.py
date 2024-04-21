@@ -20,18 +20,22 @@ class Barrel(BaseModel):
 
 @router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
-    print(f"DEBUG POST DELIVER BARRELS: {barrels_delivered} {order_id}")
+    
+    print(f"DEBUG: BARRELS DELIVERED: {barrels_delivered} WITH ORDER ID: {order_id}")
+    
     # dictionary to track total ml for barrels and total cost for each potion type
     potion_totals = {
         "green": {"ml": 0, "cost": 0},
         "red": {"ml": 0, "cost": 0},
-        "blue": {"ml": 0, "cost": 0}
+        "blue": {"ml": 0, "cost": 0},
+        "dark": {"ml": 0, "cost": 0}
     }
 
     potion_color_map = {
         (0, 1, 0, 0): "green",
         (1, 0, 0, 0): "red",  
-        (0, 0, 1, 0): "blue"
+        (0, 0, 1, 0): "blue",
+        (0, 0, 0, 1): "dark"
     }
 
     # totals for each barrel delivered
@@ -42,9 +46,7 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
             potion_totals[color]["ml"] += barrel.ml_per_barrel * barrel.quantity
             potion_totals[color]["cost"] += barrel.price * barrel.quantity
 
-    # update db for each potion type
     with db.engine.begin() as connection:
-        print("DEBUG in connectoin")
         for color, totals in potion_totals.items():
             if totals["ml"] > 0:
                 # add ml to db
@@ -66,11 +68,11 @@ class Purchase(BaseModel):
     sku: str
     quantity: int
 
-#Gets called once a day 
 @router.post("/plan")
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
-    print(f"DEBUG GETWHOLESALEPURCHASE: {wholesale_catalog}")
-    # fetch current gold amount from inventory
+    print(f"DEBUG WHOLESALE CATALOG: {wholesale_catalog}")
+
+    # fetch current gold from global inventory
     with db.engine.connect() as connection:
         result = connection.execute(sqlalchemy.text("SELECT gold FROM global_inventory"))
         gold_data = result.fetchone()
@@ -78,10 +80,8 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     if gold_data is None:
         print("No gold data found.")
         return []
-
-    
     gold = gold_data[0]
-    print(f"debug {gold}")
+
     purchase_plan = []
 
     # iterate catalog
@@ -89,10 +89,11 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         if gold < barrel.price:
             continue  # not enough gold to buy even one barrel
 
+        # calculate optimal purchaseable plan
         max_purchaseable = min(gold // barrel.price, barrel.quantity)
-        print(f"debug {max_purchaseable}")
         if max_purchaseable > 0:
             purchase_plan.append(Purchase(sku=barrel.sku, quantity=max_purchaseable))
             gold -= max_purchaseable * barrel.price  # update remaining gold after purchase
 
+    print(f"DEBUG: BARREL PURCHASE PLAN: {purchase_plan}")
     return purchase_plan

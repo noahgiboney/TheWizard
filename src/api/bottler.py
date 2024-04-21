@@ -5,6 +5,7 @@ from src.api import auth
 import sqlalchemy
 from src import database as db
 from fastapi import HTTPException
+import random
 
 router = APIRouter(
     prefix="/bottler",
@@ -16,72 +17,144 @@ class PotionInventory(BaseModel):
     potion_type: list[int]
     quantity: int
 
+def generate_potion_name():
+    adjectives = ["Magic", "Ancient", "Mystic", "Rare", "Invisible", "Fiery", "Icy", "Glowing", "Dark", "Shimmering"]
+    nouns = ["Elixir", "Potion", "Brew", "Serum", "Tonic", "Mixture", "Drink", "Concoction", "Blend", "Solution"]
+    extras = ["of Power", "of Stealth", "of Healing", "of Energy", "of Luck", "", "", "", "", ""]  # Including some blanks for variability
+
+    # Choose a random adjective and noun
+    adjective = random.choice(adjectives)
+    noun = random.choice(nouns)
+    extra = random.choice(extras)
+
+    # Form the potion name and strip any trailing spaces if no extra word is added
+    potion_name = f"{adjective} {noun} {extra}".strip()
+    return potion_name
+
+def generate_sku(name):
+    return name.upper().replace(" ", "_")
+
 @router.post("/deliver/{order_id}")
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
-    print(f"DEBUG POSTDELIVERBOTTLES: {potions_delivered}")
-    # calculate quantities delivered for each potion type
-    potion_quantities = {
-        "green": sum(potion.quantity for potion in potions_delivered if potion.potion_type == [0, 100, 0, 0]),
-        "red": sum(potion.quantity for potion in potions_delivered if potion.potion_type == [100, 0, 0, 0]),
-        "blue": sum(potion.quantity for potion in potions_delivered if potion.potion_type == [0, 0, 100, 0])
-    }
+    print(f"DEBUG POTIONS DELIVERED: {potions_delivered}")
 
-    # calculate ml used for each potion type, 100 ml per potion
-    ml_used = {color: quantity * 100 for color, quantity in potion_quantities.items()}
+    with db.engine.begin() as connection:
+        for potion in potions_delivered:
+            green, red, blue, dark = potion.potion_type
+            potion_quantity = potion.quantity
 
-    with db.engine.begin() as connection: 
-        # update database for each potion color
-        for color in ['green', 'red', 'blue']:
-            if potion_quantities[color] > 0:
-                # update potions in db
-                sql_update_potions = f"""
-                    UPDATE global_inventory 
-                    SET num_{color}_potions = num_{color}_potions + '{potion_quantities[color]}'
+            # Check if the potion already exists based on RGBD values
+            sql_check_potion = """
+                SELECT id, quantity FROM potions
+                WHERE green = :green AND red = :red AND blue = :blue AND dark = :dark
+            """
+            result = connection.execute(sqlalchemy.text(sql_check_potion), {
+                'green': green,
+                'red': red,
+                'blue': blue,
+                'dark': dark
+            })
+            potion_result = result.mappings().first()  # Use .mappings() and .first() to access as a dict
+
+            if potion_result:
+                # Potion exists, update the quantity
+                new_quantity = potion_result['quantity'] + potion_quantity
+                sql_update_potion = """
+                    UPDATE potions
+                    SET quantity = :new_quantity
+                    WHERE id = :id
                 """
-                connection.execute(sqlalchemy.text(sql_update_potions))
-                
-                # update ml in the db
+                connection.execute(sqlalchemy.text(sql_update_potion), {
+                    'new_quantity': new_quantity,
+                    'id': potion_result['id']
+                })
+            else:
+                # Potion does not exist, create a new record
+                name = generate_potion_name()
+                sku = generate_sku(name)
+                sql_insert_potion = """
+                    INSERT INTO potions (green, red, blue, dark, name, sku, price, quantity)
+                    VALUES (:green, :red, :blue, :dark, :name, :sku, :price, :quantity)
+                """
+                connection.execute(sqlalchemy.text(sql_insert_potion), {
+                    'green': green,
+                    'red': red,
+                    'blue': blue,
+                    'dark': dark,
+                    'name': name,
+                    'sku': sku,
+                    'price': 30,  # Assuming a fixed price, modify as necessary
+                    'quantity': potion_quantity
+                })
+            
+            # Update ml in the global inventory for each color component
+            for color, amount in zip(['green', 'red', 'blue', 'dark'], [green, red, blue, dark]):
+                ml_update = amount * potion_quantity
                 sql_update_ml = f"""
                     UPDATE global_inventory 
-                    SET num_{color}_ml = num_{color}_ml - {ml_used[color]}
-                    WHERE num_{color}_ml >= {ml_used[color]}
+                    SET num_{color}_ml = num_{color}_ml - :ml_update
+                    WHERE num_{color}_ml >= :ml_update
                 """
-                result = connection.execute(sqlalchemy.text(sql_update_ml))
-                if result.rowcount == 0: 
-                    connection.rollback()  
-                    return {"status": "error", "message": f"Not enough {color} ml available to fulfill the order."}
+                result = connection.execute(sqlalchemy.text(sql_update_ml), {'ml_update': ml_update})
+                if result.rowcount == 0:
+                    connection.rollback()  # Rollback if any update fails
+                    raise HTTPException(status_code=400, detail=f"Not enough {color} ml available to fulfill the order.")
 
     print(f"Potions delivered: {potions_delivered}, Order ID: {order_id}")
     return {"status": "success", "message": "Delivery processed successfully"}
 
+def generate_recepies(inventory, num_recipes=10):
+    total_inventory = sum(inventory)
+    if total_inventory == 0:
+        return []  
+    
+    recipes = []
+    while len(recipes) < num_recipes:
+        parts = [random.randint(0, stock) for stock in inventory]
+        total_parts = sum(parts)
+        if total_parts == 0:
+            continue  
+
+        normalized_parts = [part * 100 // total_parts for part in parts]
+        adjustment = 100 - sum(normalized_parts)
+        for i in range(len(normalized_parts)):
+            if normalized_parts[i] > 0:
+                normalized_parts[i] += adjustment
+                break
+
+        recipes.append(tuple(normalized_parts))
+
+    return recipes
+
 @router.post("/plan")
 def get_bottle_plan():
-    print("DEBUG: GETBOTTLEPLAN")
-    # fetch poitions ml from inventory
+    # fetch potion ml from inventory
     with db.engine.begin() as connection:
-        sql = "SELECT num_green_ml, num_red_ml, num_blue_ml FROM global_inventory"
+        sql = "SELECT num_green_ml, num_red_ml, num_blue_ml, num_dark_ml FROM global_inventory"
         result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
 
-    print(f"DEBUG: {inventory_data}")
+    inventory = list(inventory_data)
 
-    num_green_ml, num_red_ml, num_blue_ml = inventory_data
-    
+    # generate 10 possible receipies
+    recipes = generate_recepies(inventory, 10) 
+
     bottle_plan = []
     
-    # calc how many bottles can be made per potion
-    potions_to_bottle_green = num_green_ml // 100
-    if potions_to_bottle_green > 0:
-        bottle_plan.append({"potion_type": [0, 100, 0, 0], "quantity": potions_to_bottle_green})
+    #calculate bottles based on recipies
+    for recipe in recipes:
+        max_bottles = float('inf')
+        for i, ratio in enumerate(recipe):
+            if ratio > 0:
+                required_amount = ratio 
+                max_bottles = min(max_bottles, inventory[i] // required_amount)
+        
+        if max_bottles > 0:
+            bottle_plan.append({"potion_type": recipe, "quantity": max_bottles})
+            for i, ratio in enumerate(recipe):
+                inventory[i] -= max_bottles * ratio
 
-    potions_to_bottle_red = num_red_ml // 100
-    if potions_to_bottle_red > 0:
-        bottle_plan.append({"potion_type": [100, 0, 0, 0], "quantity": potions_to_bottle_red})
-
-    potions_to_bottle_blue = num_blue_ml // 100
-    if potions_to_bottle_blue > 0:
-        bottle_plan.append({"potion_type": [0, 0, 100, 0], "quantity": potions_to_bottle_blue})
-
+    print(f"DEBUG: BOTTLE PLAN: {bottle_plan}")
     return bottle_plan
 
 if __name__ == "__main__":

@@ -15,24 +15,28 @@ router = APIRouter(
 @router.get("/audit")
 def get_inventory_summary():
     
-    #fetch the full inventory
-    sql = """
-    SELECT num_green_potions, num_green_ml, num_red_potions, num_red_ml, num_blue_potions, num_blue_ml, gold
-    FROM global_inventory;
-    """
-    with db.engine.connect() as connection:
-        result = connection.execute(sqlalchemy.text(sql))
-        inventory_data = result.fetchone()
+    global_inventory_sql = "SELECT num_green_ml, num_red_ml, num_blue_ml, gold FROM global_inventory"
+    total_potions_sql = "SELECT SUM(quantity) AS total_quantity FROM potions"
 
-    if inventory_data is None:
+    with db.engine.connect() as connection:
+        result = connection.execute(sqlalchemy.text(global_inventory_sql))
+        global_data = result.fetchone()
+
+        total_potions_result = connection.execute(sqlalchemy.text(total_potions_sql))
+        total_potions_data = total_potions_result.fetchone()
+
+    if global_data is None:
         raise HTTPException(status_code=404, detail="Inventory not found.")
     
-    total_potions = inventory_data[0] + inventory_data[2] + inventory_data[4]
-    total_ml = inventory_data[1] + inventory_data[3] + inventory_data[5]
-    total_gold = inventory_data[6]
-    print(f"DEBUG TOTAL POTIONS AUDIT: {total_potions} {total_ml} {total_gold}")
+    # calculate totals
+    total_ml = global_data.num_green_ml + global_data.num_red_ml + global_data.num_blue_ml
+    total_quantity = total_potions_data.total_quantity if total_potions_data.total_quantity is not None else 0
+    total_gold = global_data.gold
+
+    print(f"DEBUG: AUDIT INVENTORY: {total_quantity}potions, {total_ml}ml, {total_gold}gold")
+
     return {
-        "number_of_potions": total_potions,
+        "number_of_potions": total_quantity,
         "ml_in_barrels": total_ml,
         "gold": total_gold
     }
