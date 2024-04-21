@@ -61,7 +61,7 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
                     "UPDATE global_inventory SET gold = gold - :cost"
                 )
                 connection.execute(sql_update_gold, {"cost": totals["cost"]})
-
+    print("DEBUG: BARRELS DELIVERED SUCCESS")
     return {"status": "success", "message": "Delivery processed and inventory updated"}
 
 class Purchase(BaseModel):
