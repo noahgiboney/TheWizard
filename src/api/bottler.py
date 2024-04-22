@@ -133,23 +133,24 @@ def get_bottle_plan():
 
     inventory = list(inventory_data)
 
-    # generate 5 possible recipes
+    # generate 6 possible recipes
     recipes = generate_recipes(inventory, 6) 
 
     bottle_plan = []
+    potion_volume_ml = 100  
     
     # calculate bottles based on recipes
     for recipe in recipes:
         max_bottles = float('inf')
         for i, ratio in enumerate(recipe):
             if ratio > 0:
-                required_amount = inventory[i] * ratio // 100
-                max_bottles = min(max_bottles, required_amount)
+                required_ml = potion_volume_ml * ratio // 100
+                max_bottles = min(max_bottles, inventory[i] // required_ml)
         
         if max_bottles > 0:
             bottle_plan.append({"potion_type": recipe, "quantity": max_bottles})
             for i, ratio in enumerate(recipe):
-                inventory[i] -= max_bottles * ratio // 100
+                inventory[i] -= max_bottles * (potion_volume_ml * ratio // 100)
 
     print(f"DEBUG: BOTTLE PLAN: {bottle_plan}")
     return bottle_plan
