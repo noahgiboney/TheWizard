@@ -130,8 +130,10 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
     try:
         with db.engine.connect() as connection:
 
+            # validate cart id
             connection.execute(sqlalchemy.text(validate_cart_sql), {'cart_id': cart_id})
 
+            # set item quanity in cart
             connection.execute(sqlalchemy.text(new_cart_item_sql), {
                 'cart_id': cart_id,
                 'quantity': cart_item.quantity,
@@ -153,7 +155,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     print(f"DEBUG: CHECKOUT for Cart ID: {cart_id} with Payment Method: {cart_checkout.payment}")
 
     with db.engine.begin() as connection:
-        # Fetch all potions in the cart along with their respective potion details
+        #fetch all potions from cart_items
         cart_sql = """
             SELECT cart_items.quantity, cart_items.potion_id, potions.price
             FROM cart_items
@@ -161,22 +163,21 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             WHERE cart_items.cart_id = :cart_id;
         """
         result = connection.execute(sqlalchemy.text(cart_sql), {'cart_id': cart_id})
-        cart_items = result.mappings().all()  # Use mappings() to access results as dictionaries
+        cart_items = result.mappings().all() 
         if not cart_items:
             raise HTTPException(status_code=404, detail="Cart is empty or does not exist")
 
         total_gold_paid = 0
 
-        # Process each cart item to update inventory and calculate total cost
+        # process items in cart
         for item in cart_items:
             quantity = item['quantity']
             price_per_potion = item['price']
 
-            # Calculate total cost
             total_cost = price_per_potion * quantity
             total_gold_paid += total_cost
 
-            # Update the potions inventory
+            # update potion inventory
             update_inventory_sql = """
                 UPDATE potions
                 SET quantity = quantity - :quantity
@@ -187,7 +188,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 'potion_id': item['potion_id']
             })
 
-        # Update gold in global inventory
+        # update gold
         if total_gold_paid > 0:
             connection.execute(sqlalchemy.text("UPDATE global_inventory SET gold = gold + :gold"), {'gold': total_gold_paid})
 
