@@ -25,15 +25,15 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     
     # dictionary to track total ml for barrels and total cost for each potion type
     potion_totals = {
-        "green": {"ml": 0, "cost": 0},
         "red": {"ml": 0, "cost": 0},
+        "green": {"ml": 0, "cost": 0},
         "blue": {"ml": 0, "cost": 0},
         "dark": {"ml": 0, "cost": 0}
     }
 
     potion_color_map = {
+        (1, 0, 0, 0): "red", 
         (0, 1, 0, 0): "green",
-        (1, 0, 0, 0): "red",  
         (0, 0, 1, 0): "blue",
         (0, 0, 0, 1): "dark"
     }

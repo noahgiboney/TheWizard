@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from src.api import auth
-import math
 import sqlalchemy
 from src import database as db
 from fastapi import HTTPException
@@ -15,7 +14,7 @@ router = APIRouter(
 @router.get("/audit")
 def get_inventory_summary():
     
-    global_inventory_sql = "SELECT num_green_ml, num_red_ml, num_blue_ml, gold FROM global_inventory"
+    global_inventory_sql = "SELECT num_red_ml, num_green_ml ,num_blue_ml, num_dark_ml , gold FROM global_inventory"
     total_potions_sql = "SELECT SUM(quantity) AS total_quantity FROM potions"
 
     with db.engine.connect() as connection:
@@ -29,7 +28,7 @@ def get_inventory_summary():
         raise HTTPException(status_code=404, detail="Inventory not found.")
     
     # calculate totals
-    total_ml = global_data.num_green_ml + global_data.num_red_ml + global_data.num_blue_ml
+    total_ml = global_data.num_red_ml + global_data.num_green_ml + global_data.num_blue_ml + global_data.num_dark_ml
     total_quantity = total_potions_data.total_quantity if total_potions_data.total_quantity is not None else 0
     total_gold = global_data.gold
 
