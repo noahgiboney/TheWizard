@@ -106,6 +106,7 @@ def create_cart(new_cart: Customer):
             })
             connection.commit()
             cart_id = result.fetchone()[0]
+            print(f"DEBUG: CREATE CART: {cart_id}")
             return {"cart_id": cart_id}
     except Exception as e:
         raise HTTPException(status_code=400, detail="Failed to create cart") from e
