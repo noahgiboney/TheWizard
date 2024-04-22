@@ -18,14 +18,16 @@ def reset():
     """
     
     with db.engine.connect() as connection:
-        sql_to_execute = """
+        reset_global_inv = """
         UPDATE global_inventory
-        SET num_green_potions = 0, num_green_ml = 0,
-        num_red_potions = 0, num_red_ml = 0,
-        num_blue_potions = 0, num_blue_ml = 0,
+        SET num_red_ml = 0, num_green_ml = 0, num_blue_ml = 0, num_dark_ml
         gold = 100;
         """
-        connection.execute(sqlalchemy.text(sql_to_execute))
+
+        reset_potions_records = "TRUNCATE TABLE potions"
+
+        connection.execute(sqlalchemy.text(reset_global_inv))
+        connection.execute(sqlalchemy.text(reset_potions_records))
         connection.commit()
     return "OK"
 
