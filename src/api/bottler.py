@@ -22,12 +22,10 @@ def generate_potion_name():
     nouns = ["Elixir", "Potion", "Brew", "Serum", "Tonic", "Mixture", "Drink", "Concoction", "Blend", "Solution"]
     extras = ["of Power", "of Stealth", "of Healing", "of Energy", "of Luck", "", "", "", "", ""]  # Including some blanks for variability
 
-    # Choose a random adjective and noun
     adjective = random.choice(adjectives)
     noun = random.choice(nouns)
     extra = random.choice(extras)
 
-    # Form the potion name and strip any trailing spaces if no extra word is added
     potion_name = f"{adjective} {noun} {extra}".strip()
     return potion_name
 
@@ -40,24 +38,25 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
 
     with db.engine.begin() as connection:
         for potion in potions_delivered:
-            green, red, blue, dark = potion.potion_type
+            red, green, blue, dark = potion.potion_type
             potion_quantity = potion.quantity
 
-            # Check if the potion already exists based on RGBD values
             sql_check_potion = """
                 SELECT id, quantity FROM potions
-                WHERE green = :green AND red = :red AND blue = :blue AND dark = :dark
+                WHERE red = :red AND green = :green AND blue = :blue AND dark = :dark
             """
+
+            # check if potions exsits
             result = connection.execute(sqlalchemy.text(sql_check_potion), {
                 'green': green,
                 'red': red,
                 'blue': blue,
                 'dark': dark
             })
-            potion_result = result.mappings().first()  # Use .mappings() and .first() to access as a dict
+            potion_result = result.mappings().first()
 
             if potion_result:
-                # Potion exists, update the quantity
+                #update the quantity
                 new_quantity = potion_result['quantity'] + potion_quantity
                 sql_update_potion = """
                     UPDATE potions
@@ -69,26 +68,26 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
                     'id': potion_result['id']
                 })
             else:
-                # Potion does not exist, create a new record
+                # if potion does not exists create a new record
                 name = generate_potion_name()
                 sku = generate_sku(name)
                 sql_insert_potion = """
-                    INSERT INTO potions (green, red, blue, dark, name, sku, price, quantity)
-                    VALUES (:green, :red, :blue, :dark, :name, :sku, :price, :quantity)
+                    INSERT INTO potions (red, green, blue, dark, name, sku, price, quantity)
+                    VALUES (:red, :green, :blue, :dark, :name, :sku, :price, :quantity)
                 """
                 connection.execute(sqlalchemy.text(sql_insert_potion), {
-                    'green': green,
                     'red': red,
+                    'green': green,
                     'blue': blue,
                     'dark': dark,
                     'name': name,
                     'sku': sku,
-                    'price': 30,  # Assuming a fixed price, modify as necessary
+                    'price': 50,
                     'quantity': potion_quantity
                 })
             
-            # Update ml in the global inventory for each color component
-            for color, amount in zip(['green', 'red', 'blue', 'dark'], [green, red, blue, dark]):
+            # update ml in inventory
+            for color, amount in zip(['red', 'green', 'blue', 'dark'], [red, green, blue, dark]):
                 ml_update = amount * potion_quantity
                 sql_update_ml = f"""
                     UPDATE global_inventory 
@@ -97,10 +96,9 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
                 """
                 result = connection.execute(sqlalchemy.text(sql_update_ml), {'ml_update': ml_update})
                 if result.rowcount == 0:
-                    connection.rollback()  # Rollback if any update fails
                     raise HTTPException(status_code=400, detail=f"Not enough {color} ml available to fulfill the order.")
 
-    print(f"Potions delivered: {potions_delivered}, Order ID: {order_id}")
+    print(f"DEBUD POTIONS DELIVERED: {potions_delivered}, orderID: {order_id}")
     return {"status": "success", "message": "Delivery processed successfully"}
 
 def generate_recepies(inventory, num_recipes=10):
