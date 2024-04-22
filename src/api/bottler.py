@@ -101,7 +101,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     print(f"DEBUD POTIONS DELIVERED: {potions_delivered}, orderID: {order_id}")
     return {"status": "success", "message": "Delivery processed successfully"}
 
-def generate_recepies(inventory, num_recipes=10):
+def generate_recipes(inventory, num_recipes=10):
     total_inventory = sum(inventory)
     if total_inventory == 0:
         return []  
@@ -126,31 +126,30 @@ def generate_recepies(inventory, num_recipes=10):
 
 @router.post("/plan")
 def get_bottle_plan():
-    # fetch potion ml from inventory
     with db.engine.begin() as connection:
-        sql = "SELECT num_green_ml, num_red_ml, num_blue_ml, num_dark_ml FROM global_inventory"
+        sql = "SELECT num_red_ml, num_green_ml, num_blue_ml, num_dark_ml FROM global_inventory"
         result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
 
     inventory = list(inventory_data)
 
-    # generate 10 possible receipies
-    recipes = generate_recepies(inventory, 10) 
+    # generate 5 possible recipes
+    recipes = generate_recipes(inventory, 6) 
 
     bottle_plan = []
     
-    #calculate bottles based on recipies
+    # calculate bottles based on recipes
     for recipe in recipes:
         max_bottles = float('inf')
         for i, ratio in enumerate(recipe):
             if ratio > 0:
-                required_amount = ratio 
-                max_bottles = min(max_bottles, inventory[i] // required_amount)
+                required_amount = inventory[i] * ratio // 100
+                max_bottles = min(max_bottles, required_amount)
         
         if max_bottles > 0:
             bottle_plan.append({"potion_type": recipe, "quantity": max_bottles})
             for i, ratio in enumerate(recipe):
-                inventory[i] -= max_bottles * ratio
+                inventory[i] -= max_bottles * ratio // 100
 
     print(f"DEBUG: BOTTLE PLAN: {bottle_plan}")
     return bottle_plan
