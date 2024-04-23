@@ -72,7 +72,7 @@ class Purchase(BaseModel):
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     print(f"DEBUG WHOLESALE CATALOG: {wholesale_catalog}")
 
-    # fetch current gold from global inventory
+    # fetch gold from global inventory
     with db.engine.connect() as connection:
         result = connection.execute(sqlalchemy.text("SELECT gold FROM global_inventory"))
         gold_data = result.fetchone()
@@ -82,36 +82,26 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         return []
     gold = gold_data[0]
 
-    # Group barrels by type
+    # group barrels by type and sort by cost efficiency (price per ml)
     type_dict = {}
     for barrel in wholesale_catalog:
         type_key = tuple(barrel.potion_type)
         if type_key not in type_dict:
             type_dict[type_key] = []
         type_dict[type_key].append(barrel)
+        type_dict[type_key].sort(key=lambda x: x.price / x.ml_per_barrel)
 
     purchase_plan = []
-
-   #try to purchase differnt types of barrels
     types_bought = set()
-    for type1 in type_dict:
-        for type2 in type_dict:
-            if type1 != type2 and (type1 not in types_bought and type2 not in types_bought):
-                barrel1, barrel2 = type_dict[type1][0], type_dict[type2][0]
-                if gold >= barrel1.price + barrel2.price:
-                    purchase_plan.append(Purchase(sku=barrel1.sku, quantity=1))
-                    purchase_plan.append(Purchase(sku=barrel2.sku, quantity=1))
-                    gold -= (barrel1.price + barrel2.price)
-                    types_bought.update([type1, type2])
 
-   #buy single barrel 
-    for type_key, barrels in type_dict.items():
-        if type_key not in types_bought:
-            barrel = barrels[0]
+    # prioritize purchasing barrels from different types with the best price/ml
+    for type_key in sorted(type_dict.keys(), key=lambda k: type_dict[k][0].price / type_dict[k][0].ml_per_barrel):
+        for barrel in type_dict[type_key]:
             if gold >= barrel.price:
                 purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
                 gold -= barrel.price
                 types_bought.add(type_key)
+                break 
 
     print(f"DEBUG: BARREL PURCHASE PLAN: {purchase_plan}")
     return purchase_plan
