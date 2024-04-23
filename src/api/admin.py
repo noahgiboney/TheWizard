@@ -24,9 +24,15 @@ def reset():
         gold = 100;
         """
 
+        reset_carts = "TRUNCATE TABLE carts"
+
+        reset_carts_items = "TRUNCATE TABLE cart_items"
+
         reset_potions_records = "TRUNCATE TABLE potions"
 
         connection.execute(sqlalchemy.text(reset_global_inv))
+        connection.execute(sqlalchemy.text(reset_carts))
+        connection.execute(sqlalchemy.text(reset_carts_items))
         connection.execute(sqlalchemy.text(reset_potions_records))
         connection.commit()
     return "OK"
