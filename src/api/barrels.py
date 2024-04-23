@@ -82,21 +82,36 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         return []
     gold = gold_data[0]
 
+    # Group barrels by type
+    type_dict = {}
+    for barrel in wholesale_catalog:
+        type_key = tuple(barrel.potion_type)
+        if type_key not in type_dict:
+            type_dict[type_key] = []
+        type_dict[type_key].append(barrel)
+
     purchase_plan = []
 
-    # iterate catalog
-    for barrel in wholesale_catalog:
-        if gold < barrel.price:
-            continue  # not enough gold to buy even one barrel
+   #try to purchase differnt types of barrels
+    types_bought = set()
+    for type1 in type_dict:
+        for type2 in type_dict:
+            if type1 != type2 and (type1 not in types_bought and type2 not in types_bought):
+                barrel1, barrel2 = type_dict[type1][0], type_dict[type2][0]
+                if gold >= barrel1.price + barrel2.price:
+                    purchase_plan.append(Purchase(sku=barrel1.sku, quantity=1))
+                    purchase_plan.append(Purchase(sku=barrel2.sku, quantity=1))
+                    gold -= (barrel1.price + barrel2.price)
+                    types_bought.update([type1, type2])
 
-        if barrel.potion_type[0] == 1:
-            continue
-
-        # calculate optimal purchaseable plan
-        max_purchaseable = min(gold // barrel.price, barrel.quantity)
-        if max_purchaseable > 0:
-            purchase_plan.append(Purchase(sku=barrel.sku, quantity=max_purchaseable))
-            gold -= max_purchaseable * barrel.price  # update remaining gold after purchase
+   #buy single barrel 
+    for type_key, barrels in type_dict.items():
+        if type_key not in types_bought:
+            barrel = barrels[0]
+            if gold >= barrel.price:
+                purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
+                gold -= barrel.price
+                types_bought.add(type_key)
 
     print(f"DEBUG: BARREL PURCHASE PLAN: {purchase_plan}")
     return purchase_plan
