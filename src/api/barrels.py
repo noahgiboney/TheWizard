@@ -89,6 +89,9 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         if gold < barrel.price:
             continue  # not enough gold to buy even one barrel
 
+        if barrel.potion_type[0] == 1:
+            continue
+
         # calculate optimal purchaseable plan
         max_purchaseable = min(gold // barrel.price, barrel.quantity)
         if max_purchaseable > 0:
