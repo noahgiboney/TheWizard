@@ -82,7 +82,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
                     'dark': dark,
                     'name': name,
                     'sku': sku,
-                    'price': 50,
+                    'price': 40,
                     'quantity': potion_quantity
                 })
             
