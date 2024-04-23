@@ -127,34 +127,35 @@ def generate_recipes(inventory, num_recipes=10):
 @router.post("/plan")
 def get_bottle_plan():
     with db.engine.begin() as connection:
-        # First, check the total existing potions
+
+        # check the amount of potions
         result = connection.execute(sqlalchemy.text("SELECT SUM(quantity) FROM potions"))
         total_existing_potions = result.scalar() or 0
 
-        # If there are already 50 or more potions, return empty plan
+        # bottle nothing if i have 50 potions
         if total_existing_potions >= 50:
             print("DEBUG: No bottling needed, sufficient stock available.")
             return []
 
-        # Retrieve inventory data
+        # get global inventory 
         sql = "SELECT num_red_ml, num_green_ml, num_blue_ml, num_dark_ml FROM global_inventory"
         result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
 
     inventory = list(inventory_data)
 
-    # Generate 6 possible recipes
+    # generate 6 possible recipes
     recipes = generate_recipes(inventory, 6) 
 
     bottle_plan = []
     potion_volume_ml = 100
-    total_bottles = total_existing_potions  # Start with the existing potion count
-    max_total_bottles = 50  # Maximum number of bottles allowed
+    total_bottles = total_existing_potions 
+    max_total_bottles = 50 
 
-    # Calculate bottles based on recipes
+    # calculate bottles based on recipes
     for recipe in recipes:
         if total_bottles >= max_total_bottles:
-            break  # Stop if the maximum number of bottles has been reached
+            break  #
 
         max_bottles = float('inf')
         for i, ratio in enumerate(recipe):
@@ -162,7 +163,7 @@ def get_bottle_plan():
                 required_ml = potion_volume_ml * ratio // 100
                 max_bottles = min(max_bottles, inventory[i] // required_ml)
 
-        # Calculate the number of bottles to produce for this recipe
+        # calculate the number of bottles to produce for this recipe
         max_bottles = min(max_bottles, (max_total_bottles - total_bottles) // len(recipes))
 
         if max_bottles > 0:
