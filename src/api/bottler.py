@@ -127,6 +127,16 @@ def generate_recipes(inventory, num_recipes=10):
 @router.post("/plan")
 def get_bottle_plan():
     with db.engine.begin() as connection:
+        # First, check the total existing potions
+        result = connection.execute(sqlalchemy.text("SELECT SUM(quantity) FROM potions"))
+        total_existing_potions = result.scalar() or 0
+
+        # If there are already 50 or more potions, return empty plan
+        if total_existing_potions >= 50:
+            print("DEBUG: No bottling needed, sufficient stock available.")
+            return []
+
+        # Retrieve inventory data
         sql = "SELECT num_red_ml, num_green_ml, num_blue_ml, num_dark_ml FROM global_inventory"
         result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
@@ -138,9 +148,9 @@ def get_bottle_plan():
 
     bottle_plan = []
     potion_volume_ml = 100
-    total_bottles = 0  # Track the total number of bottles planned
+    total_bottles = total_existing_potions  # Start with the existing potion count
     max_total_bottles = 50  # Maximum number of bottles allowed
-    
+
     # Calculate bottles based on recipes
     for recipe in recipes:
         if total_bottles >= max_total_bottles:
