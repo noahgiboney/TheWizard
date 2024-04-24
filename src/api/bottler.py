@@ -18,13 +18,34 @@ class PotionInventory(BaseModel):
     quantity: int
 
 def generate_potion_name():
-    adjectives = ["Magic", "Ancient", "Mystic", "Rare", "Invisible", "Fiery", "Icy", "Glowing", "Dark", "Shimmering"]
-    nouns = ["Elixir", "Potion", "Brew", "Serum", "Tonic", "Mixture", "Drink", "Concoction", "Blend", "Solution"]
-    extras = ["of Power", "of Stealth", "of Healing", "of Energy", "of Luck", "", "", "", "", ""]  # Including some blanks for variability
-
+    adjectives = [
+        "Magic", "Ancient", "Mystic", "Rare", "Invisible", "Fiery", "Icy", "Glowing",
+        "Dark", "Shimmering", "Sparkling", "Bubbling", "Spectral", "Enchanted",
+        "Venomous", "Potent", "Vibrant", "Dull", "Soothing", "Aggressive"
+    ]
+    nouns = [
+        "Elixir", "Potion", "Brew", "Serum", "Tonic", "Mixture", "Drink", "Concoction",
+        "Blend", "Solution", "Philter", "Draft", "Distillate", "Extract", "Essence"
+    ]
+    extras = [
+        "of Power", "of Stealth", "of Healing", "of Energy", "of Luck", "of Might",
+        "of Wisdom", "of Charm", "of Speed", "of Invisibility", "", "", "", "", ""
+    ]
+    effects = [
+        "Revitalization", "Endurance", "Intellect", "Strength", "Courage", "Fright",
+        "Tranquility", "Haste", "Slumber", "Transparency"
+    ]
     adjective = random.choice(adjectives)
+    second_adjective = random.choice(adjectives + [""])
     noun = random.choice(nouns)
     extra = random.choice(extras)
+    effect = random.choice(effects + ["", "", "", "", ""])
+
+    if random.choice([True, False]):
+        adjective = f"{adjective} {second_adjective}".strip()
+
+    if random.choice([True, False]):
+        extra = f"{extra} of {effect}".strip()
 
     potion_name = f"{adjective} {noun} {extra}".strip()
     return potion_name
