@@ -41,56 +41,55 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
             red, green, blue, dark = potion.potion_type
             potion_quantity = potion.quantity
 
+            # check if the potion with the exact composition already exists
             sql_check_potion = """
                 SELECT id, quantity FROM potions
                 WHERE red = :red AND green = :green AND blue = :blue AND dark = :dark
             """
-
-            # check if potions exsits
-            result = connection.execute(sqlalchemy.text(sql_check_potion), {
-                'green': green,
-                'red': red,
-                'blue': blue,
-                'dark': dark
+            result = connection.execute(sql_check_potion(sql_check_potion), {
+                'red': red, 'green': green, 'blue': blue, 'dark': dark
             })
             potion_result = result.mappings().first()
 
             if potion_result:
-                #update the quantity
+                # update the quantity of the existing potion
                 new_quantity = potion_result['quantity'] + potion_quantity
                 sql_update_potion = """
                     UPDATE potions
                     SET quantity = :new_quantity
                     WHERE id = :id
                 """
-                connection.execute(sqlalchemy.text(sql_update_potion), {
+                connection.execute(text(sql_update_potion), {
                     'new_quantity': new_quantity,
                     'id': potion_result['id']
                 })
             else:
-                # if potion does not exists create a new record
-                name = generate_potion_name()
-                sku = generate_sku(name)
+                # generate a new potion name and SKU
+                unique_sku_found = False
+                while not unique_sku_found:
+                    name = generate_potion_name()
+                    sku = generate_sku(name)
+
+                    # check if the generated SKU already exists
+                    result = connection.execute(sqlalchemy.text("SELECT COUNT(*) FROM potions WHERE sku = :sku"), {'sku': sku})
+                    if result.scalar() == 0:
+                        unique_sku_found = True
+
+                # insert the new potion record
                 sql_insert_potion = """
                     INSERT INTO potions (red, green, blue, dark, name, sku, price, quantity)
                     VALUES (:red, :green, :blue, :dark, :name, :sku, :price, :quantity)
                 """
                 connection.execute(sqlalchemy.text(sql_insert_potion), {
-                    'red': red,
-                    'green': green,
-                    'blue': blue,
-                    'dark': dark,
-                    'name': name,
-                    'sku': sku,
-                    'price': 40,
-                    'quantity': potion_quantity
+                    'red': red, 'green': green, 'blue': blue, 'dark': dark,
+                    'name': name, 'sku': sku, 'price': 40, 'quantity': potion_quantity
                 })
-            
+
             # update ml in inventory
             for color, amount in zip(['red', 'green', 'blue', 'dark'], [red, green, blue, dark]):
                 ml_update = amount * potion_quantity
                 sql_update_ml = f"""
-                    UPDATE global_inventory 
+                    UPDATE global_inventory
                     SET num_{color}_ml = num_{color}_ml - :ml_update
                     WHERE num_{color}_ml >= :ml_update
                 """
