@@ -35,6 +35,8 @@ def generate_potion_name():
         "Revitalization", "Endurance", "Intellect", "Strength", "Courage", "Fright",
         "Tranquility", "Haste", "Slumber", "Transparency"
     ]
+
+    # Choose components for the name randomly
     adjective = random.choice(adjectives)
     second_adjective = random.choice(adjectives + [""])
     noun = random.choice(nouns)
@@ -67,7 +69,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
                 SELECT id, quantity FROM potions
                 WHERE red = :red AND green = :green AND blue = :blue AND dark = :dark
             """
-            result = connection.execute(sql_check_potion(sql_check_potion), {
+            result = connection.execute(sqlalchemy.text(sql_check_potion), {
                 'red': red, 'green': green, 'blue': blue, 'dark': dark
             })
             potion_result = result.mappings().first()
@@ -80,7 +82,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
                     SET quantity = :new_quantity
                     WHERE id = :id
                 """
-                connection.execute(text(sql_update_potion), {
+                connection.execute(sqlalchemy.text(sql_update_potion), {
                     'new_quantity': new_quantity,
                     'id': potion_result['id']
                 })
