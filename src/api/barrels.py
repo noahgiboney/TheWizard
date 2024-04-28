@@ -19,16 +19,14 @@ class Barrel(BaseModel):
     quantity: int
 
 @router.post("/deliver/{order_id}")
-def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
-    
+def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):   
     print(f"DEBUG: BARRELS DELIVERED: {barrels_delivered} WITH ORDER ID: {order_id}")
     
-    # dictionary to track total ml for barrels and total cost for each potion type
     potion_totals = {
-        "red": {"ml": 0, "cost": 0},
-        "green": {"ml": 0, "cost": 0},
-        "blue": {"ml": 0, "cost": 0},
-        "dark": {"ml": 0, "cost": 0}
+        "red": 0,
+        "green": 0,
+        "blue": 0,
+        "dark": 0
     }
 
     potion_color_map = {
@@ -38,29 +36,35 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
         (0, 0, 0, 1): "dark"
     }
 
-    # totals for each barrel delivered
-    for barrel in barrels_delivered:
-        potion_type = tuple(barrel.potion_type)
-        if potion_type in potion_color_map:
-            color = potion_color_map[potion_type]
-            potion_totals[color]["ml"] += barrel.ml_per_barrel * barrel.quantity
-            potion_totals[color]["cost"] += barrel.price * barrel.quantity
-
     with db.engine.begin() as connection:
-        for color, totals in potion_totals.items():
-            if totals["ml"] > 0:
-                # add ml to db
-                sql_update_ml = sqlalchemy.text(
-                    f"UPDATE global_inventory SET num_{color}_ml = num_{color}_ml + :ml_added"
-                )
-                connection.execute(sql_update_ml, {"ml_added": totals["ml"]})
+        for barrel in barrels_delivered:
+            potion_type = tuple(barrel.potion_type)
+            if potion_type in potion_color_map:
+                color = potion_color_map[potion_type]
+                potion_totals[color] += barrel.ml_per_barrel * barrel.quantity
 
-            if totals["cost"] > 0:
-                # subtract gold in db
-                sql_update_gold = sqlalchemy.text(
-                    "UPDATE global_inventory SET gold = gold - :cost"
-                )
-                connection.execute(sql_update_gold, {"cost": totals["cost"]})
+        # inserting changes into ml_ledger for each color
+        sql_insert_ml_ledger = sqlalchemy.text(
+            "INSERT INTO ml_ledger (red_change, green_change, blue_change, dark_change) "
+            "VALUES (:red_change, :green_change, :blue_change, :dark_change)"
+        )
+        connection.execute(
+            sql_insert_ml_ledger,
+            {
+                "red_change": potion_totals["red"],
+                "green_change": potion_totals["green"],
+                "blue_change": potion_totals["blue"],
+                "dark_change": potion_totals["dark"]
+            }
+        )
+
+        # insert a record for gold spent in gold ledger
+        total_cost = sum(barrel.price * barrel.quantity for barrel in barrels_delivered)
+        sql_update_gold = sqlalchemy.text(
+            "INSERT INTO gold_ledger (quantity_change) VALUES(:cost)"
+        )
+        connection.execute(sql_update_gold, {"cost": -total_cost})
+
     print("DEBUG: BARRELS DELIVERED SUCCESS")
     return {"status": "success", "message": "Delivery processed and inventory updated"}
 
@@ -74,13 +78,14 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
 
     # fetch gold from global inventory
     with db.engine.connect() as connection:
-        result = connection.execute(sqlalchemy.text("SELECT gold FROM global_inventory"))
+        result = connection.execute(sqlalchemy.text("SELECT SUM(quantity_change) as gold from gold_ledger"))
         gold_data = result.fetchone()
 
     if gold_data is None:
         print("No gold data found.")
         return []
-    gold = gold_data[0]
+    gold = gold_data.gold
+    print(gold)
 
     # group barrels by type and sort by cost efficiency (price per ml)
     type_dict = {}

@@ -179,19 +179,17 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             total_gold_paid += total_cost
 
             # update potion inventory
-            update_inventory_sql = """
-                UPDATE potions
-                SET quantity = quantity - :quantity
-                WHERE id = :potion_id;
+            update_potions = """
+            INSERT INTO potion_ledger (potion_id, quantity_change) VALUES(:potion_id, :quantity_change)
             """
-            connection.execute(sqlalchemy.text(update_inventory_sql), {
-                'quantity': quantity,
-                'potion_id': item['potion_id']
+            connection.execute(sqlalchemy.text(update_potions), {
+                'potion_id': item['potion_id'],
+                'quantity_change': -quantity
             })
 
         # update gold
         if total_gold_paid > 0:
-            connection.execute(sqlalchemy.text("UPDATE global_inventory SET gold = gold + :gold"), {'gold': total_gold_paid})
+            connection.execute(sqlalchemy.text("INSERT INTO gold_ledger (quantity_change) VALUES (:quantity_change)"), {'quantity_change': total_gold_paid})
 
     return {
         "total_potions_bought": sum(item['quantity'] for item in cart_items),

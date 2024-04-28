@@ -14,28 +14,30 @@ router = APIRouter(
 @router.get("/audit")
 def get_inventory_summary():
     
-    global_inventory_sql = "SELECT num_red_ml, num_green_ml ,num_blue_ml, num_dark_ml , gold FROM global_inventory"
-    total_potions_sql = "SELECT SUM(quantity) AS total_quantity FROM potions"
+    
+    gold_sql = "SELECT SUM(quantity_change) as gold from gold_ledger"
+    potions_sql = "SELECT SUM(quantity_change) as potions from potion_ledger"
+    ml_sql = "SELECT SUM(red_change + green_change + blue_change + dark_change) as ml from ml_ledger"
 
     with db.engine.connect() as connection:
-        result = connection.execute(sqlalchemy.text(global_inventory_sql))
-        global_data = result.fetchone()
+        gold_result = connection.execute(sqlalchemy.text(gold_sql))
+        gold_data = gold_result.fetchone()
 
-        total_potions_result = connection.execute(sqlalchemy.text(total_potions_sql))
-        total_potions_data = total_potions_result.fetchone()
+        potion_result = connection.execute(sqlalchemy.text(potions_sql))
+        potion_data = potion_result.fetchone()
 
-    if global_data is None:
-        raise HTTPException(status_code=404, detail="Inventory not found.")
+        ml_result = connection.execute(sqlalchemy.text(ml_sql))
+        ml_data = ml_result.fetchone()
     
     # calculate totals
-    total_ml = global_data.num_red_ml + global_data.num_green_ml + global_data.num_blue_ml + global_data.num_dark_ml
-    total_quantity = total_potions_data.total_quantity if total_potions_data.total_quantity is not None else 0
-    total_gold = global_data.gold
+    total_potions = potion_data.potions
+    total_gold = gold_data.gold
+    total_ml = ml_data.ml
 
-    print(f"DEBUG: AUDIT INVENTORY: {total_quantity}potions, {total_ml}ml, {total_gold}gold")
+    print(f"DEBUG: AUDIT INVENTORY: {total_potions}potions, {total_ml}ml, {total_gold}gold")
 
     return {
-        "number_of_potions": total_quantity,
+        "number_of_potions": total_potions,
         "ml_in_barrels": total_ml,
         "gold": total_gold
     }

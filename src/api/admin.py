@@ -18,22 +18,18 @@ def reset():
     """
     
     with db.engine.connect() as connection:
-        reset_global_inv = """
-        UPDATE global_inventory
-        SET num_red_ml = 0, num_green_ml = 0, num_blue_ml = 0, num_dark_ml
-        gold = 100;
-        """
 
-        reset_carts = "TRUNCATE TABLE carts"
+        # clear carts
+        connection.execute(sqlalchemy.text("TRUNCATE TABLE carts"))
+        connection.execute(sqlalchemy.text("TRUNCATE TABLE cart_items"))
 
-        reset_carts_items = "TRUNCATE TABLE cart_items"
+        # clear ledgers
+        connection.execute(sqlalchemy.text("TRUNCATE TABLE gold_ledger"))
+        connection.execute(sqlalchemy.text("TRUNCATE TABLE ml_ledger"))
+        connection.execute(sqlalchemy.text("TRUNCATE TABLE potion_ledger"))
 
-        reset_potions_records = "TRUNCATE TABLE potions"
-
-        connection.execute(sqlalchemy.text(reset_global_inv))
-        connection.execute(sqlalchemy.text(reset_carts))
-        connection.execute(sqlalchemy.text(reset_carts_items))
-        connection.execute(sqlalchemy.text(reset_potions_records))
+        # insert 100 gold
+        connection.execute(sqlalchemy.text("INSERT INTO gold_ledger (quantity_change) VALUES (:quantity_change)"), {'quantity_change': 100})
         connection.commit()
     return "OK"
 
