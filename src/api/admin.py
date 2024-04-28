@@ -20,9 +20,9 @@ def reset():
     with db.engine.connect() as connection:
 
         # clear carts
-        connection.execute(sqlalchemy.text("TRUNCATE TABLE carts"))
         connection.execute(sqlalchemy.text("TRUNCATE TABLE cart_items"))
-
+        connection.execute(sqlalchemy.text("TRUNCATE TABLE carts"))
+       
         # clear ledgers
         connection.execute(sqlalchemy.text("TRUNCATE TABLE gold_ledger"))
         connection.execute(sqlalchemy.text("TRUNCATE TABLE ml_ledger"))
