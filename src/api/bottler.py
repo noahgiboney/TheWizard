@@ -88,12 +88,12 @@ def get_bottle_plan():
 
         # Predefined recipes with their corresponding potion IDs
         recipes = {
-            (100, 0, 0, 0),
-            (20, 0, 80, 0),
-            (0, 0, 100, 0),
-            (0, 30, 70, 0),
-            (50, 0, 50, 0),
-            (0, 50, 0, 50)
+            (100, 0, 0, 0): None,
+            (20, 0, 80, 0): None,
+            (0, 0, 100, 0): None,
+            (0, 30, 70, 0): None,
+            (50, 0, 50, 0): None,
+            (0, 50, 0, 50): None
         }
 
         # Calculate bottles based on predefined recipes
