@@ -87,14 +87,14 @@ def get_bottle_plan():
 
         # Get potion recipes from the potions table
         recipes_result = connection.execute(sqlalchemy.text("SELECT red, green, blue, dark, id FROM potions"))
-        recipes = { (row.red, row.green, row.blue, row.dark): row.id for row in recipes_result }
+        recipes = { (row.red, row.green, row.blue, row.dark): (row.red, row.green, row.blue, row.dark) for row in recipes_result }
 
         # Initialize the bottle plan
         bottle_plan = []
         max_total_bottles = 50
 
         # Calculate bottles based on the recipes from the database
-        for recipe, potion_id in recipes.items():
+        for recipe, potion_type in recipes.items():
             if total_existing_potions >= max_total_bottles:
                 break
 
@@ -112,7 +112,7 @@ def get_bottle_plan():
                     if ratio > 0:
                         inventory[i] -= max_bottles * ratio
 
-                bottle_plan.append({"potion_id": potion_id, "quantity": max_bottles})
+                bottle_plan.append({"potion_type": list(potion_type), "quantity": max_bottles})
                 total_existing_potions += max_bottles
 
         print(f"DEBUG: BOTTLE PLAN: {bottle_plan}")
