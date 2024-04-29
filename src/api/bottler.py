@@ -64,33 +64,38 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     print(f"DEBUG POTIONS DELIVERED: {potions_delivered}, orderID: {order_id}")
     return {"status": "success", "message": "Delivery processed successfully"}
 
+from fastapi import APIRouter
+import sqlalchemy
+
+router = APIRouter()
+
 @router.post("/plan")
 def get_bottle_plan():
     with db.engine.begin() as connection:
-        # check the total amount of existing potions
-        result = connection.execute(sqlalchemy.text("SELECT SUM(quantity_change) FROM potion_ledger"))
-        total_existing_potions = result.scalar() or 0
+        # Check the total amount of existing potions
+        result = connection.execute(sqlalchemy.text("SELECT COALESCE(SUM(quantity_change), 0) FROM potion_ledger"))
+        total_existing_potions = result.scalar()
 
-        # bottle nothing if there are already 50 or more potions
+        # Bottle nothing if there are already 50 or more potions
         if total_existing_potions >= 50:
             print("DEBUG: No bottling needed, sufficient stock available.")
             return []
 
-        # get current material inventory
-        sql = "SELECT SUM(red_change), SUM(green_change), SUM(blue_change), SUM(dark_change) FROM ml_ledger"
+        # Get current material inventory
+        sql = "SELECT COALESCE(SUM(red_change), 0), COALESCE(SUM(green_change), 0), COALESCE(SUM(blue_change), 0), COALESCE(SUM(dark_change), 0) FROM ml_ledger"
         result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
-        inventory = list(inventory_data)
+        inventory = [amount or 0 for amount in inventory_data]  # Ensure no None values
 
-        # get potion recipes from the potions table
+        # Get potion recipes from the potions table
         recipes_result = connection.execute(sqlalchemy.text("SELECT red, green, blue, dark, id FROM potions"))
         recipes = { (row.red, row.green, row.blue, row.dark): row.id for row in recipes_result }
 
-        # initialize the bottle plan
+        # Initialize the bottle plan
         bottle_plan = []
         max_total_bottles = 50
 
-        # calculate bottles based on the recipes from the database
+        # Calculate bottles based on the recipes from the database
         for recipe, potion_id in recipes.items():
             if total_existing_potions >= max_total_bottles:
                 break
@@ -100,11 +105,11 @@ def get_bottle_plan():
                 if ratio > 0:
                     max_bottles = min(max_bottles, inventory[i] // ratio)
 
-            # calculate the number of bottles to produce for this recipe
+            # Calculate the number of bottles to produce for this recipe
             max_bottles = min(max_bottles, max_total_bottles - total_existing_potions)
 
             if max_bottles > 0:
-                # update the inventory for used ml
+                # Update the inventory for used ml
                 for i, ratio in enumerate(recipe):
                     if ratio > 0:
                         inventory[i] -= max_bottles * ratio
