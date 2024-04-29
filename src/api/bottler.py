@@ -67,8 +67,6 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
 from fastapi import APIRouter
 import sqlalchemy
 
-router = APIRouter()
-
 @router.post("/plan")
 def get_bottle_plan():
     with db.engine.begin() as connection:
