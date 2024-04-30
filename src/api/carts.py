@@ -31,43 +31,58 @@ def search_orders(
     sort_col: search_sort_options = search_sort_options.timestamp,
     sort_order: search_sort_order = search_sort_order.desc,
 ):
+    if sort_order == search_sort_order.desc:
+        order = "DESC"
+    else:
+        order = "ASC"
+
+    sql_to_execute = f"""
+    SELECT
+        cart.customer_name,
+        ci.item_sku,
+        ci.quantity,
+        ci.cart_id,
+        cart.created_at AS timestamp
+    FROM
+        cart_items ci
+    JOIN
+        carts cart ON ci.cart_id = cart_id
+    WHERE
+        (:customer_name = '' AND :potion_sku = '') OR
+        (:customer_name != '' AND :potion_sku != '' AND cart.customer_name ILIKE :customer_name AND ci.item_sku ILIKE :potion_sku) OR
+        (:customer_name = '' AND ci.item_sku ILIKE :potion_sku) OR
+        (:potion_sku = '' AND cart.customer_name ILIKE :customer_name)
+    ORDER BY
+        {sort_col.value} {order}, ci.cart_id ASC
+    LIMIT
+        5 OFFSET :cur_page
     """
-    Search for cart line items by customer name and/or potion sku.
 
-    Customer name and potion sku filter to orders that contain the 
-    string (case insensitive). If the filters aren't provided, no
-    filtering occurs on the respective search term.
+    cur_page = int(search_page) * 5  # Pagination is set to 5 items per page
 
-    Search page is a cursor for pagination. The response to this
-    search endpoint will return previous or next if there is a
-    previous or next page of results available. The token passed
-    in that search response can be passed in the next search request
-    as search page to get that page of results.
+    return_list = []
+    with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text(sql_to_execute), {
+            "cur_page": cur_page, 
+            "customer_name": f'%{customer_name}%', 
+            "potion_sku": f'%{potion_sku}%'
+        })
+        for row in result:
+            plural = "s" if row.quantity > 1 else ""
+            return_list.append({
+                "cart_id": row.cart_id,
+                "item_sku": f"{row.quantity} {row.item_sku.replace('_', ' ')}{plural}",
+                "customer_name": row.customer_name,
+                "timestamp": row.timestamp.isoformat(),
+            })
 
-    Sort col is which column to sort by and sort order is the direction
-    of the search. They default to searching by timestamp of the order
-    in descending order.
-
-    The response itself contains a previous and next page token (if
-    such pages exist) and the results as an array of line items. Each
-    line item contains the line item id (must be unique), item sku, 
-    customer name, line item total (in gold), and timestamp of the order.
-    Your results must be paginated, the max results you can return at any
-    time is 5 total line items.
-    """
+    next_page = str(int(search_page) + 1) if len(return_list) == 5 else ""
+    previous_page = str(int(search_page) - 1) if int(search_page) > 0 else ""
 
     return {
-        "previous": "",
-        "next": "",
-        "results": [
-            {
-                "line_item_id": 1,
-                "item_sku": "1 oblivion potion",
-                "customer_name": "Scaramouche",
-                "line_item_total": 50,
-                "timestamp": "2021-01-01T00:00:00Z",
-            }
-        ],
+        "previous": previous_page,
+        "next": next_page,
+        "results": return_list,
     }
 
 
