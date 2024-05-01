@@ -27,15 +27,19 @@ class search_sort_order(str, Enum):
 def search_orders(
     customer_name: str = "",
     potion_sku: str = "",
-    search_page: str = "0",  # Default page set to '0'
+    search_page: str = "0",  # Default page set to '0' if empty
     sort_col: search_sort_options = search_sort_options.timestamp,
     sort_order: search_sort_order = search_sort_order.desc,
 ):
+    
+    if search_page == "":
+        search_page = "0"
+
     if sort_order == search_sort_order.desc:
         order = "DESC"
     else:
         order = "ASC"
-    
+
     try:
         cur_page = int(search_page) * 5  # Pagination is set to 5 items per page
     except ValueError:
