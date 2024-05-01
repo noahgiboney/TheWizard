@@ -141,33 +141,34 @@ class CartItem(BaseModel):
 def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
     """Update the quantity of an item in the cart."""
 
-    validate_cart_sql="""
+    validate_cart_sql = """
     SELECT EXISTS(SELECT 1 FROM carts WHERE id = :cart_id);
     """
     
     new_cart_item_sql = """
-        INSERT INTO cart_items (cart_id, quantity, item_sku, potion_id, created_at) 
-        SELECT :cart_id, :quantity, :item_sku, potions.id, :created_at
-        FROM potions WHERE potions.sku = :item_sku
-        """
+        INSERT INTO cart_items (cart_id, item_sku, quantity, potion_id, created_at, cost) 
+        SELECT :cart_id, :item_sku, :quantity, potions.id, :created_at, (:quantity * potions.price) AS cost
+        FROM potions
+        WHERE potions.sku = :item_sku
+    """
     try:
         with db.engine.connect() as connection:
+            # validate cart ID
+            cart_exists = connection.execute(sqlalchemy.text(validate_cart_sql), {'cart_id': cart_id}).scalar()
+            if not cart_exists:
+                raise HTTPException(status_code=404, detail="Cart not found")
 
-            # validate cart id
-            connection.execute(sqlalchemy.text(validate_cart_sql), {'cart_id': cart_id})
-
-            # set item quanity in cart
+            # set item quantity and calculate cost in cart
             connection.execute(sqlalchemy.text(new_cart_item_sql), {
                 'cart_id': cart_id,
-                'quantity': cart_item.quantity,
                 'item_sku': item_sku,
+                'quantity': cart_item.quantity,
                 'created_at': datetime.now()
             })
             connection.commit()
-            return {"success" : True}
+            return {"success": True}
     except Exception as e:
-        print(e)
-        return {"success" : False}
+        return {"success": False, "message": str(e)}
 
 
 class CartCheckout(BaseModel):
