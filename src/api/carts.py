@@ -27,7 +27,7 @@ class search_sort_order(str, Enum):
 def search_orders(
     customer_name: str = "",
     potion_sku: str = "",
-    search_page: str = "",
+    search_page: str = "0",  # Default page set to '0'
     sort_col: search_sort_options = search_sort_options.timestamp,
     sort_order: search_sort_order = search_sort_order.desc,
 ):
@@ -35,6 +35,11 @@ def search_orders(
         order = "DESC"
     else:
         order = "ASC"
+    
+    try:
+        cur_page = int(search_page) * 5  # Pagination is set to 5 items per page
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid page number.")
 
     sql_to_execute = f"""
     SELECT
@@ -46,7 +51,7 @@ def search_orders(
     FROM
         cart_items ci
     JOIN
-        carts cart ON ci.cart_id = cart_id
+        carts cart ON ci.cart_id = cart.id
     WHERE
         (:customer_name = '' AND :potion_sku = '') OR
         (:customer_name != '' AND :potion_sku != '' AND cart.customer_name ILIKE :customer_name AND ci.item_sku ILIKE :potion_sku) OR
@@ -58,13 +63,11 @@ def search_orders(
         5 OFFSET :cur_page
     """
 
-    cur_page = int(search_page) * 5  # Pagination is set to 5 items per page
-
     return_list = []
     with db.engine.begin() as connection:
         result = connection.execute(sqlalchemy.text(sql_to_execute), {
-            "cur_page": cur_page, 
-            "customer_name": f'%{customer_name}%', 
+            "cur_page": cur_page,
+            "customer_name": f'%{customer_name}%',
             "potion_sku": f'%{potion_sku}%'
         })
         for row in result:
