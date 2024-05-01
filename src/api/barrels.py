@@ -85,7 +85,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         print("No gold data found.")
         return []
     gold = gold_data.gold
-    print(gold)
+    print(f"DEBUG: Starting gold: {gold}")
 
     # group barrels by type and sort by cost efficiency (price per ml)
     type_dict = {}
@@ -97,16 +97,19 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         type_dict[type_key].sort(key=lambda x: x.price / x.ml_per_barrel)
 
     purchase_plan = []
-    types_bought = set()
+    total_ml = 0  # Track total milliliters purchased
 
     # prioritize purchasing barrels from different types with the best price/ml
     for type_key in sorted(type_dict.keys(), key=lambda k: type_dict[k][0].price / type_dict[k][0].ml_per_barrel):
+        if total_ml >= 10000:
+            break  # Stop adding if total ml exceeds or reaches 10,000 ml
         for barrel in type_dict[type_key]:
-            if gold >= barrel.price:
+            if gold >= barrel.price and total_ml + barrel.ml_per_barrel <= 10000:
                 purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
                 gold -= barrel.price
-                types_bought.add(type_key)
-                break 
+                total_ml += barrel.ml_per_barrel
+                print(f"DEBUG: Bought barrel {barrel.sku} adding {barrel.ml_per_barrel}ml, total ml: {total_ml}")
+                break
 
     print(f"DEBUG: BARREL PURCHASE PLAN: {purchase_plan}")
     return purchase_plan
