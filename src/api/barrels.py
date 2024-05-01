@@ -102,25 +102,23 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         type_dict[type_key].sort(key=lambda x: x.price / x.ml_per_barrel)
 
     purchase_plan = []
-    total_ml = current_ml.copy() 
+    total_ml = current_ml.copy()
 
     # calculate target ml for each type to aim for even distribution
-    total_current_ml = sum(current_ml.values())
-    average_ml = total_current_ml // len(current_ml) if total_current_ml > 0 else 500  # Avoid division by zero; default to 500 if no ml
+    total_current_ml = sum(total_ml.values())
+    average_ml = total_current_ml // len(total_ml) if total_current_ml > 0 else 5000  # Default to 500 if no ml
 
     # prioritize purchasing barrels from different types with the best price/ml
     for type_key in sorted(type_dict.keys(), key=lambda k: type_dict[k][0].price / type_dict[k][0].ml_per_barrel):
         type_name = ['red', 'green', 'blue', 'dark'][type_key.index(1)]  # Map type_key to a string name
-        while total_ml[type_name] < average_ml:
-            for barrel in type_dict[type_key]:
-                if gold >= barrel.price and (total_ml[type_name] + barrel.ml_per_barrel <= average_ml):
-                    purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
-                    gold -= barrel.price
-                    total_ml[type_name] += barrel.ml_per_barrel
-                    print(f"DEBUG: Bought barrel {barrel.sku} adding {barrel.ml_per_barrel}ml, total {type_name} ml: {total_ml[type_name]}")
-                    break
-            else:
-                break  # break if no suitable barrel found
+        for barrel in type_dict[type_key]:
+            if gold < barrel.price or total_ml[type_name] >= average_ml + 5000:  # Allow exceeding average up to a limit
+                continue
+            if total_ml[type_name] + barrel.ml_per_barrel <= average_ml + 5000:  # New condition to allow buying slightly beyond average
+                purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
+                gold -= barrel.price
+                total_ml[type_name] += barrel.ml_per_barrel
+                print(f"DEBUG: Bought barrel {barrel.sku} adding {barrel.ml_per_barrel}ml, total {type_name} ml: {total_ml[type_name]}")
 
     print(f"DEBUG: BARREL PURCHASE PLAN: {purchase_plan}")
     return purchase_plan
