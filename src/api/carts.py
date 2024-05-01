@@ -41,7 +41,7 @@ def search_orders(
         order = "ASC"
 
     try:
-        cur_page = int(search_page) * 5  # Pagination is set to 5 items per page
+        cur_page = int(search_page) * 5  
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid page number.")
 
@@ -51,6 +51,7 @@ def search_orders(
         ci.item_sku,
         ci.quantity,
         ci.cart_id,
+        ci.cost AS line_item_cost,
         cart.created_at AS timestamp
     FROM
         cart_items ci
@@ -80,6 +81,7 @@ def search_orders(
                 "cart_id": row.cart_id,
                 "item_sku": f"{row.quantity} {row.item_sku.replace('_', ' ')}{plural}",
                 "customer_name": row.customer_name,
+                "line_item_cost": row.line_item_cost,
                 "timestamp": row.timestamp.isoformat(),
             })
 
@@ -91,7 +93,6 @@ def search_orders(
         "next": next_page,
         "results": return_list,
     }
-
 
 class Customer(BaseModel):
     customer_name: str
