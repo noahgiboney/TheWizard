@@ -51,7 +51,7 @@ def search_orders(
         ci.item_sku,
         ci.quantity,
         ci.cart_id,
-        ci.cost AS line_item_cost,
+        ci.cost AS line_item_total,
         cart.created_at AS timestamp
     FROM
         cart_items ci
@@ -81,7 +81,7 @@ def search_orders(
                 "cart_id": row.cart_id,
                 "item_sku": f"{row.quantity} {row.item_sku.replace('_', ' ')}{plural}",
                 "customer_name": row.customer_name,
-                "line_item_cost": row.line_item_cost,
+                "line_item_total": row.line_item_total,
                 "timestamp": row.timestamp.isoformat(),
             })
 
