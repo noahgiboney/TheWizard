@@ -78,14 +78,19 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
 
     # fetch gold from global inventory
     with db.engine.connect() as connection:
-        result = connection.execute(sqlalchemy.text("SELECT SUM(quantity_change) as gold from gold_ledger"))
-        gold_data = result.fetchone()
+        gold_result = connection.execute(sqlalchemy.text("SELECT SUM(quantity_change) as gold from gold_ledger"))
+        gold_data = gold_result.fetchone()
+        ml_result = connection.execute(sqlalchemy.text("SELECT SUM(red_change) as red, SUM(green_change) as green, SUM(blue_change) as blue, SUM(dark_change) as dark from ml_ledger"))
+        ml_data = ml_result.fetchone()
 
-    if gold_data is None:
-        print("No gold data found.")
+    if gold_data is None or ml_data is None:
+        print("No sufficient data found.")
         return []
+
     gold = gold_data.gold
-    print(f"DEBUG: Starting gold: {gold}")
+    current_ml = {'red': ml_data.red or 0, 'green': ml_data.green or 0, 'blue': ml_data.blue or 0, 'dark': ml_data.dark or 0}
+
+    print(f"DEBUG: Starting gold: {gold}, Current ml: {current_ml}")
 
     # group barrels by type and sort by cost efficiency (price per ml)
     type_dict = {}
@@ -97,19 +102,25 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         type_dict[type_key].sort(key=lambda x: x.price / x.ml_per_barrel)
 
     purchase_plan = []
-    total_ml = 0  # Track total milliliters purchased
+    total_ml = current_ml.copy() 
+
+    # calculate target ml for each type to aim for even distribution
+    total_current_ml = sum(current_ml.values())
+    average_ml = total_current_ml // len(current_ml) if total_current_ml > 0 else 500  # Avoid division by zero; default to 500 if no ml
 
     # prioritize purchasing barrels from different types with the best price/ml
     for type_key in sorted(type_dict.keys(), key=lambda k: type_dict[k][0].price / type_dict[k][0].ml_per_barrel):
-        if total_ml >= 5000:
-            break  # Stop adding if total ml exceeds or reaches 10,000 ml
-        for barrel in type_dict[type_key]:
-            if gold >= barrel.price and total_ml + barrel.ml_per_barrel <= 5000:
-                purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
-                gold -= barrel.price
-                total_ml += barrel.ml_per_barrel
-                print(f"DEBUG: Bought barrel {barrel.sku} adding {barrel.ml_per_barrel}ml, total ml: {total_ml}")
-                break
+        type_name = ['red', 'green', 'blue', 'dark'][type_key.index(1)]  # Map type_key to a string name
+        while total_ml[type_name] < average_ml:
+            for barrel in type_dict[type_key]:
+                if gold >= barrel.price and (total_ml[type_name] + barrel.ml_per_barrel <= average_ml):
+                    purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
+                    gold -= barrel.price
+                    total_ml[type_name] += barrel.ml_per_barrel
+                    print(f"DEBUG: Bought barrel {barrel.sku} adding {barrel.ml_per_barrel}ml, total {type_name} ml: {total_ml[type_name]}")
+                    break
+            else:
+                break  # break if no suitable barrel found
 
     print(f"DEBUG: BARREL PURCHASE PLAN: {purchase_plan}")
     return purchase_plan
