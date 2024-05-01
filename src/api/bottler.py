@@ -87,33 +87,43 @@ def get_bottle_plan():
 
         # Get potion recipes from the potions table
         recipes_result = connection.execute(sqlalchemy.text("SELECT red, green, blue, dark, id FROM potions"))
-        recipes = { (row.red, row.green, row.blue, row.dark): (row.red, row.green, row.blue, row.dark) for row in recipes_result }
+        recipes = {row.id: (row.red, row.green, row.blue, row.dark) for row in recipes_result}
 
         # Initialize the bottle plan
         bottle_plan = []
-        max_total_bottles = 50
+        max_total_bottles = 50 - total_existing_potions
 
-        # Calculate bottles based on the recipes from the database
-        for recipe, potion_type in recipes.items():
-            if total_existing_potions >= max_total_bottles:
+        # Calculate maximum possible bottles for each recipe based on available inventory
+        potion_capacities = {}
+        for potion_id, recipe in recipes.items():
+            min_bottles_by_material = []
+            for i, required_material in enumerate(recipe):
+                if required_material > 0:
+                    max_bottles = inventory[i] // required_material
+                    min_bottles_by_material.append(max_bottles)
+            potion_capacities[potion_id] = min(min_bottles_by_material) if min_bottles_by_material else 0
+
+        total_capacity = sum(potion_capacities.values())
+
+        if total_capacity == 0:
+            print("DEBUG: No materials available for bottling.")
+            return []
+
+        for potion_id, max_bottles in potion_capacities.items():
+            if max_total_bottles == 0:
                 break
 
-            max_bottles = float('inf')
-            for i, ratio in enumerate(recipe):
-                if ratio > 0:
-                    max_bottles = min(max_bottles, inventory[i] // ratio)
+            allocated_bottles = int((max_bottles / total_capacity) * max_total_bottles)
+            allocated_bottles = min(allocated_bottles, max_bottles, max_total_bottles)
+            if allocated_bottles > 0:
+                bottle_plan.append({"potion_type": potion_id, "quantity": allocated_bottles})
+                max_total_bottles -= allocated_bottles
 
-            # Calculate the number of bottles to produce for this recipe
-            max_bottles = min(max_bottles, max_total_bottles - total_existing_potions)
-
-            if max_bottles > 0:
-                # Update the inventory for used ml
-                for i, ratio in enumerate(recipe):
-                    if ratio > 0:
-                        inventory[i] -= max_bottles * ratio
-
-                bottle_plan.append({"potion_type": list(potion_type), "quantity": max_bottles})
-                total_existing_potions += max_bottles
+                # update the inventory
+                recipe = recipes[potion_id]
+                for i, required_material in enumerate(recipe):
+                    if required_material > 0:
+                        inventory[i] -= allocated_bottles * required_material
 
         print(f"DEBUG: BOTTLE PLAN: {bottle_plan}")
         return bottle_plan
