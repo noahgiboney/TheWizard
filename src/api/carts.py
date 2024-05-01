@@ -35,13 +35,12 @@ def search_orders(
     if search_page == "":
         search_page = "0"
 
-    if sort_order == search_sort_order.desc:
-        order = "DESC"
-    else:
-        order = "ASC"
+    order = "DESC" if sort_order == search_sort_order.desc else "ASC"
+
+    sort_column = 'ci.cost' if sort_col == search_sort_options.line_item_total else sort_col.value
 
     try:
-        cur_page = int(search_page) * 5  
+        cur_page = int(search_page) * 5
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid page number.")
 
@@ -51,7 +50,7 @@ def search_orders(
         ci.item_sku,
         ci.quantity,
         ci.cart_id,
-        ci.cost AS line_item_total,
+        ci.cost AS line_item_cost,
         cart.created_at AS timestamp
     FROM
         cart_items ci
@@ -63,7 +62,7 @@ def search_orders(
         (:customer_name = '' AND ci.item_sku ILIKE :potion_sku) OR
         (:potion_sku = '' AND cart.customer_name ILIKE :customer_name)
     ORDER BY
-        {sort_col.value} {order}, ci.cart_id ASC
+        {sort_column} {order}, ci.cart_id ASC
     LIMIT
         5 OFFSET :cur_page
     """
@@ -81,7 +80,7 @@ def search_orders(
                 "cart_id": row.cart_id,
                 "item_sku": f"{row.quantity} {row.item_sku.replace('_', ' ')}{plural}",
                 "customer_name": row.customer_name,
-                "line_item_total": row.line_item_total,
+                "line_item_cost": row.line_item_cost,
                 "timestamp": row.timestamp.isoformat(),
             })
 
