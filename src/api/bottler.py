@@ -26,7 +26,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
             red, green, blue, dark = potion.potion_type
             potion_quantity = potion.quantity
 
-            # Get potion ID from the potions table
+            # grab id from potions table
             sql_get_potion_id = """
                 SELECT id FROM potions
                 WHERE red = :red AND green = :green AND blue = :blue AND dark = :dark
@@ -37,7 +37,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
             potion_id = result.scalar()
 
             if potion_id:
-                # Insert records into potion_ledger for the delivered potions
+                # insert records into potion_ledger for the delivered potions
                 sql_insert_potion_ledger = """
                     INSERT INTO potion_ledger (potion_id, quantity_change)
                     VALUES (:potion_id, :quantity_change)
@@ -49,7 +49,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
             else:
                 raise HTTPException(status_code=404, detail="Potion not found")
 
-            # Insert a new row into ml_ledger for the change in ML
+            # insert a new row into ml_ledger for the change in ML
             sql_insert_ml_ledger = """
                 INSERT INTO ml_ledger (red_change, green_change, blue_change, dark_change)
                 VALUES (:red_change, :green_change, :blue_change, :dark_change)

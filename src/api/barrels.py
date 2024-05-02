@@ -110,11 +110,11 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
 
     # prioritize purchasing barrels from different types with the best price/ml
     for type_key in sorted(type_dict.keys(), key=lambda k: type_dict[k][0].price / type_dict[k][0].ml_per_barrel):
-        type_name = ['red', 'green', 'blue', 'dark'][type_key.index(1)]  # Map type_key to a string name
+        type_name = ['red', 'green', 'blue', 'dark'][type_key.index(1)]  
         for barrel in type_dict[type_key]:
-            if gold < barrel.price or total_ml[type_name] >= average_ml + 5000:  # Allow exceeding average up to a limit
+            if gold < barrel.price or total_ml[type_name] >= average_ml + 5000:
                 continue
-            if total_ml[type_name] + barrel.ml_per_barrel <= average_ml + 5000:  # New condition to allow buying slightly beyond average
+            if total_ml[type_name] + barrel.ml_per_barrel <= average_ml + 5000:
                 purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
                 gold -= barrel.price
                 total_ml[type_name] += barrel.ml_per_barrel
