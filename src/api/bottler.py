@@ -69,24 +69,33 @@ import sqlalchemy
 
 @router.post("/plan")
 def get_bottle_plan():
-     with db.engine.begin() as connection:
+    with db.engine.begin() as connection:
+        # fetch the current potion capacity
+        capacity_result = connection.execute(sqlalchemy.text("SELECT potion_capacity FROM capacity LIMIT 1"))
+        capacity_data = capacity_result.scalar()
+        max_allowed_potions = capacity_data * 50 
+
+        # fetch the current number of potions in stock
         result = connection.execute(sqlalchemy.text("SELECT COALESCE(SUM(quantity_change), 0) FROM potion_ledger"))
         total_existing_potions = result.scalar()
 
-        if total_existing_potions >= 50:
+        # check if the current stock is already sufficient
+        if total_existing_potions >= max_allowed_potions:
             print("DEBUG: No bottling needed, sufficient stock available.")
             return []
 
+        # fetch current ML inventory
         sql = "SELECT COALESCE(SUM(red_change), 0), COALESCE(SUM(green_change), 0), COALESCE(SUM(blue_change), 0), COALESCE(SUM(dark_change), 0) FROM ml_ledger"
         result = connection.execute(sqlalchemy.text(sql))
         inventory_data = result.fetchone()
         inventory = [amount or 0 for amount in inventory_data]
 
+        #potion recipes
         recipes_result = connection.execute(sqlalchemy.text("SELECT red, green, blue, dark, id FROM potions"))
         recipes = {row.id: [row.red, row.green, row.blue, row.dark] for row in recipes_result}
 
         bottle_plan = []
-        max_total_bottles = 50 - total_existing_potions
+        max_total_bottles = max_allowed_potions - total_existing_potions
         potion_capacities = {potion_id: min(inventory[i] // required_material if required_material > 0 else float('inf') for i, required_material in enumerate(recipe)) for potion_id, recipe in recipes.items() if any(recipe)}
 
         total_capacity = sum(potion_capacities.values())

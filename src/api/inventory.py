@@ -45,14 +45,21 @@ def get_inventory_summary():
 # Gets called once a day
 @router.post("/plan")
 def get_capacity_plan():
-    """ 
-    Start with 1 capacity for 50 potions and 1 capacity for 10000 ml of potion. Each additional 
-    capacity unit costs 1000 gold.
-    """
+    """Plan how many capacities of potions and ml can be bought based on available gold."""
+    gold_sql = "SELECT COALESCE(SUM(quantity_change), 0) as gold from gold_ledger"
+    with db.engine.begin() as connection:
+        gold_result = connection.execute(sqlalchemy.text(gold_sql))
+        gold_data = gold_result.fetchone()
+        current_gold = gold_data.gold
 
-    return {
-        "potion_capacity": 0,
-        "ml_capacity": 0
+        max_possible_capacities = current_gold // 1000
+
+        additional_potion_capacity = max_possible_capacities // 2
+        additional_ml_capacity = max_possible_capacities - additional_potion_capacity
+
+        return {
+            "potion_capacity": additional_potion_capacity,
+            "ml_capacity": additional_ml_capacity
         }
 
 class CapacityPurchase(BaseModel):
@@ -62,9 +69,16 @@ class CapacityPurchase(BaseModel):
 # Gets called once a day
 @router.post("/deliver/{order_id}")
 def deliver_capacity_plan(capacity_purchase : CapacityPurchase, order_id: int):
-    """ 
-    Start with 1 capacity for 50 potions and 1 capacity for 10000 ml of potion. Each additional 
-    capacity unit costs 1000 gold.
-    """
+    """Updates capacities for potions and ml based on purchased units."""
+    with db.engine.begin() as connection:
+        # update potion capacity
+        connection.execute(sqlalchemy.text("""
+            UPDATE capacity SET potion_capacity = potion_capacity + :new_potion_capacity
+        """), {'new_potion_capacity': capacity_purchase.potion_capacity})
 
-    return "OK"
+        # update ml capacity
+        connection.execute(sqlalchemy.text("""
+            UPDATE capacity SET ml_capacity = ml_capacity + :new_ml_capacity
+        """), {'new_ml_capacity': capacity_purchase.ml_capacity})
+
+        return {"status": "success", "message": "Capacity delivered successfully"}

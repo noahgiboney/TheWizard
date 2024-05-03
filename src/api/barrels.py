@@ -76,21 +76,25 @@ class Purchase(BaseModel):
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     print(f"DEBUG WHOLESALE CATALOG: {wholesale_catalog}")
 
-    # fetch gold from global inventory
     with db.engine.connect() as connection:
+        # fetch gold and current ml from ledgers
         gold_result = connection.execute(sqlalchemy.text("SELECT SUM(quantity_change) as gold from gold_ledger"))
         gold_data = gold_result.fetchone()
         ml_result = connection.execute(sqlalchemy.text("SELECT SUM(red_change) as red, SUM(green_change) as green, SUM(blue_change) as blue, SUM(dark_change) as dark from ml_ledger"))
         ml_data = ml_result.fetchone()
+        # fetch the current ml capacity
+        capacity_result = connection.execute(sqlalchemy.text("SELECT ml_capacity FROM capacity LIMIT 1"))
+        ml_capacity_data = capacity_result.scalar()
 
-    if gold_data is None or ml_data is None:
-        print("No sufficient data found.")
-        return []
+    if gold_data is None or ml_data is None or ml_capacity_data is None:
+        print("Insufficient data for processing.")
+        raise HTTPException(status_code=404, detail="Required data not available")
 
     gold = gold_data.gold
+    max_allowed_ml = ml_capacity_data * 10000  
     current_ml = {'red': ml_data.red or 0, 'green': ml_data.green or 0, 'blue': ml_data.blue or 0, 'dark': ml_data.dark or 0}
 
-    print(f"DEBUG: Starting gold: {gold}, Current ml: {current_ml}")
+    print(f"DEBUG: Starting gold: {gold}, Current ml: {current_ml}, ML Capacity: {max_allowed_ml}")
 
     # group barrels by type and sort by cost efficiency (price per ml)
     type_dict = {}
@@ -104,17 +108,16 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     purchase_plan = []
     total_ml = current_ml.copy()
 
-    # calculate target ml for each type to aim for even distribution
-    total_current_ml = sum(total_ml.values())
-    average_ml = total_current_ml // len(total_ml) if total_current_ml > 0 else 5000  # Default to 500 if no ml
+    # calculate target ml for each type to aim for even distribution up to allowed capacity
+    target_ml = {color: min(max_allowed_ml // 4, max_allowed_ml - sum(total_ml.values())) for color in total_ml}
 
     # prioritize purchasing barrels from different types with the best price/ml
     for type_key in sorted(type_dict.keys(), key=lambda k: type_dict[k][0].price / type_dict[k][0].ml_per_barrel):
-        type_name = ['red', 'green', 'blue', 'dark'][type_key.index(1)]  
+        type_name = ['red', 'green', 'blue', 'dark'][type_key.index(1)]
         for barrel in type_dict[type_key]:
-            if gold < barrel.price or total_ml[type_name] >= average_ml + 5000:
+            if gold < barrel.price or total_ml[type_name] >= target_ml[type_name]:
                 continue
-            if total_ml[type_name] + barrel.ml_per_barrel <= average_ml + 5000:
+            if total_ml[type_name] + barrel.ml_per_barrel <= target_ml[type_name]:
                 purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
                 gold -= barrel.price
                 total_ml[type_name] += barrel.ml_per_barrel
