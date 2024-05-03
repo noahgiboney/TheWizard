@@ -19,8 +19,6 @@ class PotionInventory(BaseModel):
 
 @router.post("/deliver/{order_id}")
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
-    print(f"DEBUG POTIONS DELIVERED: {potions_delivered}")
-
     with db.engine.begin() as connection:
         for potion in potions_delivered:
             red, green, blue, dark = potion.potion_type
@@ -61,7 +59,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
                 'dark_change': -dark * potion_quantity
             })
 
-    print(f"DEBUG POTIONS DELIVERED: {potions_delivered}, orderID: {order_id}")
+    print(f"DEBUG POTIONS BOTTLED: {potions_delivered}, orderID: {order_id}")
     return {"status": "success", "message": "Delivery processed successfully"}
 
 from fastapi import APIRouter
@@ -109,7 +107,6 @@ def get_bottle_plan():
                                 local_inventory[i] -= recipe[i] * allocated_bottles
                         bottle_plan.append({"potion_type": recipes[potion_id], "quantity": allocated_bottles})
                         max_allowed_potions -= allocated_bottles
-                        print(f"DEBUG: Allocating {allocated_bottles} bottles for potion {potion_id}, new inventory: {local_inventory}")
                         if max_allowed_potions <= 0:
                             break
 
