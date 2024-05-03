@@ -13,29 +13,49 @@ router = APIRouter(
 
 @router.get("/audit")
 def get_inventory_summary():
-    
-    
+    # SQL queries to fetch total changes for gold and potions
     gold_sql = "SELECT SUM(quantity_change) as gold from gold_ledger"
     potions_sql = "SELECT SUM(quantity_change) as potions from potion_ledger"
-    ml_sql = "SELECT SUM(red_change + green_change + blue_change + dark_change) as ml from ml_ledger"
+    
+    # Separate SQL queries to fetch changes for each ml color
+    red_sql = "SELECT SUM(red_change) as red from ml_ledger"
+    green_sql = "SELECT SUM(green_change) as green from ml_ledger"
+    blue_sql = "SELECT SUM(blue_change) as blue from ml_ledger"
+    dark_sql = "SELECT SUM(dark_change) as dark from ml_ledger"
 
     with db.engine.connect() as connection:
+        # Executing and fetching gold and potions data
         gold_result = connection.execute(sqlalchemy.text(gold_sql))
         gold_data = gold_result.fetchone()
-
+        
         potion_result = connection.execute(sqlalchemy.text(potions_sql))
         potion_data = potion_result.fetchone()
+        
+        # Executing and fetching data for each ml color
+        red_result = connection.execute(sqlalchemy.text(red_sql))
+        red_data = red_result.fetchone()
+        
+        green_result = connection.execute(sqlalchemy.text(green_sql))
+        green_data = green_result.fetchone()
+        
+        blue_result = connection.execute(sqlalchemy.text(blue_sql))
+        blue_data = blue_result.fetchone()
+        
+        dark_result = connection.execute(sqlalchemy.text(dark_sql))
+        dark_data = dark_result.fetchone()
 
-        ml_result = connection.execute(sqlalchemy.text(ml_sql))
-        ml_data = ml_result.fetchone()
-    
-    # calculate totals
-    total_potions = potion_data.potions
-    total_gold = gold_data.gold
-    total_ml = ml_data.ml
+    # Calculate totals for gold, potions, and ml
+    total_potions = potion_data.potions if potion_data.potions else 0
+    total_gold = gold_data.gold if gold_data.gold else 0
+    total_ml = (red_data.red if red_data.red else 0) + \
+               (green_data.green if green_data.green else 0) + \
+               (blue_data.blue if blue_data.blue else 0) + \
+               (dark_data.dark if dark_data.dark else 0)
 
-    print(f"DEBUG: AUDIT INVENTORY: {total_potions}potions, {total_ml}ml, {total_gold}gold")
+    # Print totals for each ml color for debugging
+    print(f"DEBUG: ML COLORS - Red: {red_data.red if red_data.red else 0}, Green: {green_data.green if green_data.green else 0}, Blue: {blue_data.blue if blue_data.blue else 0}, Dark: {dark_data.dark if dark_data.dark else 0}")
 
+    # Return totals for gold, potions, and ml in specified format
     return {
         "number_of_potions": total_potions,
         "ml_in_barrels": total_ml,

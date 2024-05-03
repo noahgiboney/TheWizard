@@ -70,50 +70,50 @@ import sqlalchemy
 @router.post("/plan")
 def get_bottle_plan():
     with db.engine.begin() as connection:
-        # fetch the current potion capacity
+        # fetch potion capacity 
         capacity_result = connection.execute(sqlalchemy.text("SELECT potion_capacity FROM capacity LIMIT 1"))
         capacity_data = capacity_result.scalar()
         max_allowed_potions = capacity_data * 50 
 
-        # fetch the current number of potions in stock
+        # fetch current potions
         result = connection.execute(sqlalchemy.text("SELECT COALESCE(SUM(quantity_change), 0) FROM potion_ledger"))
         total_existing_potions = result.scalar()
 
-        # check if the current stock is already sufficient
-        if total_existing_potions >= max_allowed_potions:
+        # max bottles
+        max_allowed_potions -= total_existing_potions
+        if max_allowed_potions <= 0:
             print("DEBUG: No bottling needed, sufficient stock available.")
             return []
 
-        # fetch current ML inventory
+        # fetch ml inventory
         sql = "SELECT COALESCE(SUM(red_change), 0), COALESCE(SUM(green_change), 0), COALESCE(SUM(blue_change), 0), COALESCE(SUM(dark_change), 0) FROM ml_ledger"
         result = connection.execute(sqlalchemy.text(sql))
-        inventory_data = result.fetchone()
-        inventory = [amount or 0 for amount in inventory_data]
+        inventory = [amount or 0 for amount in result.fetchone()]
+        local_inventory = inventory[:]  # Local copy of the inventory for adjustments
 
-        #potion recipes
+        # load recipes
         recipes_result = connection.execute(sqlalchemy.text("SELECT red, green, blue, dark, id FROM potions"))
         recipes = {row.id: [row.red, row.green, row.blue, row.dark] for row in recipes_result}
 
         bottle_plan = []
-        max_total_bottles = max_allowed_potions - total_existing_potions
-        potion_capacities = {potion_id: min(inventory[i] // required_material if required_material > 0 else float('inf') for i, required_material in enumerate(recipe)) for potion_id, recipe in recipes.items() if any(recipe)}
+        # calculate the maximum bottles per potion based on the local inventory
+        for potion_id, recipe in recipes.items():
+            if any(recipe):  
+                max_bottles_for_recipe = min((local_inventory[i] // recipe[i] if recipe[i] > 0 else float('inf')) for i in range(4))
+                if max_bottles_for_recipe > 0:
+                    allocated_bottles = min(max_bottles_for_recipe, max_allowed_potions)
+                    if allocated_bottles > 0:
+                        # adjust local inventory based on the allocated bottles
+                        for i in range(4):
+                            if recipe[i] > 0:
+                                local_inventory[i] -= recipe[i] * allocated_bottles
+                        bottle_plan.append({"potion_type": recipes[potion_id], "quantity": allocated_bottles})
+                        max_allowed_potions -= allocated_bottles
+                        print(f"DEBUG: Allocating {allocated_bottles} bottles for potion {potion_id}, new inventory: {local_inventory}")
+                        if max_allowed_potions <= 0:
+                            break
 
-        total_capacity = sum(potion_capacities.values())
-
-        if total_capacity == 0:
-            print("DEBUG: No materials available for bottling.")
-            return []
-
-        for potion_id, max_bottles in sorted(potion_capacities.items(), key=lambda x: x[1], reverse=True):
-            if max_total_bottles == 0:
-                break
-            allocated_bottles = int((max_bottles / total_capacity) * max_total_bottles)
-            allocated_bottles = min(allocated_bottles, max_bottles, max_total_bottles)
-            if allocated_bottles > 0:
-                bottle_plan.append({"potion_type": recipes[potion_id], "quantity": allocated_bottles})
-                max_total_bottles -= allocated_bottles
-
-        print(f"DEBUG: BOTTLE PLAN: {bottle_plan}")
+        print(f"DEBUG: FINAL BOTTLE PLAN: {bottle_plan}")
         return bottle_plan
 
 if __name__ == "__main__":
