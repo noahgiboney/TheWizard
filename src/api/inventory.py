@@ -62,21 +62,11 @@ def get_inventory_summary():
 @router.post("/plan")
 def get_capacity_plan():
     """Plan how many capacities of potions and ml can be bought based on available gold."""
-    gold_sql = "SELECT COALESCE(SUM(quantity_change), 0) as gold from gold_ledger"
-    with db.engine.begin() as connection:
-        gold_result = connection.execute(sqlalchemy.text(gold_sql))
-        gold_data = gold_result.fetchone()
-        current_gold = gold_data.gold
 
-        max_possible_capacities = current_gold // 1000
-
-        additional_potion_capacity = max_possible_capacities // 2
-        additional_ml_capacity = max_possible_capacities - additional_potion_capacity
-
-        return {
-            "potion_capacity": additional_potion_capacity,
-            "ml_capacity": additional_ml_capacity
-        }
+    return {
+        "potion_capacity": 0,
+        "ml_capacity": 0
+    }
 
 class CapacityPurchase(BaseModel):
     potion_capacity: int
@@ -85,7 +75,7 @@ class CapacityPurchase(BaseModel):
 # Gets called once a day
 @router.post("/deliver/{order_id}")
 def deliver_capacity_plan(capacity_purchase : CapacityPurchase, order_id: int):
-    """Updates capacities for potions and ml based on purchased units."""
+    """Updates capacities for potions and ml based on purchased units and logs the transaction in the gold ledger."""
     with db.engine.begin() as connection:
         # update potion capacity
         connection.execute(sqlalchemy.text("""
@@ -97,4 +87,22 @@ def deliver_capacity_plan(capacity_purchase : CapacityPurchase, order_id: int):
             UPDATE capacity SET ml_capacity = ml_capacity + :new_ml_capacity
         """), {'new_ml_capacity': capacity_purchase.ml_capacity})
 
-        return {"status": "success", "message": "Capacity delivered successfully"}
+        if capacity_purchase.potion_capacity > 0:
+            # log the transaction in the gold ledger for potion capacity purchase
+            connection.execute(sqlalchemy.text("""
+                INSERT INTO gold_ledger (quantity_change)
+                VALUES (:quantity_change)
+            """), {
+                'quantity_change': -1000 * capacity_purchase.potion_capacity, 
+            })
+
+        if capacity_purchase.ml_capacity > 0:
+            # log the transaction in the gold ledger for ml capacity purchase
+            connection.execute(sqlalchemy.text("""
+                INSERT INTO gold_ledger (quantity_change)
+                VALUES (:quantity_change)
+            """), {
+                'quantity_change': -1000 * capacity_purchase.ml_capacity, 
+            })
+
+        return {"status": "success", "message": "Capacity delivered and ledger updated successfully"}

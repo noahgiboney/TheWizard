@@ -9,7 +9,7 @@ import re
 router = APIRouter()
 @router.get("/catalog/", tags=["catalog"])
 def get_catalog():
-    # Fetch potions from the potions table along with total quantity available
+    # fetch potions along with total quantity available
     sql = """
     SELECT p.id, p.name, p.sku, p.price, COALESCE(SUM(pl.quantity_change), 0) as quantity,
            p.red, p.green, p.blue, p.dark

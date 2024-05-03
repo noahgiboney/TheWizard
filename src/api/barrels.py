@@ -121,7 +121,6 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                 purchase_plan.append(Purchase(sku=barrel.sku, quantity=1))
                 gold -= barrel.price
                 total_ml[type_name] += barrel.ml_per_barrel
-                print(f"DEBUG: Bought barrel {barrel.sku} adding {barrel.ml_per_barrel}ml, total {type_name} ml: {total_ml[type_name]}")
 
     print(f"DEBUG: BARREL PURCHASE PLAN: {purchase_plan}")
     return purchase_plan
