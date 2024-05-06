@@ -87,7 +87,7 @@ def get_bottle_plan():
         sql = "SELECT COALESCE(SUM(red_change), 0), COALESCE(SUM(green_change), 0), COALESCE(SUM(blue_change), 0), COALESCE(SUM(dark_change), 0) FROM ml_ledger"
         result = connection.execute(sqlalchemy.text(sql))
         inventory = [amount or 0 for amount in result.fetchone()]
-        local_inventory = inventory[:]  # Local copy of the inventory for adjustments
+        local_inventory = inventory[:]
 
         # load recipes
         recipes_result = connection.execute(sqlalchemy.text("SELECT red, green, blue, dark, id FROM potions"))
