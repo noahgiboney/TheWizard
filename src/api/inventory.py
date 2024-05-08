@@ -64,8 +64,8 @@ def get_capacity_plan():
     """Plan how many capacities of potions and ml can be bought based on available gold."""
 
     return {
-        "potion_capacity": 0,
-        "ml_capacity": 0
+        "potion_capacity": 1,
+        "ml_capacity": 1
     }
 
 class CapacityPurchase(BaseModel):
