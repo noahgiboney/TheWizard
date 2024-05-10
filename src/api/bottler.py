@@ -95,7 +95,6 @@ def get_bottle_plan():
         recipes = {row.id: [row.red, row.green, row.blue, row.dark] for row in recipes_result}
         print(f"DEBUG: Loaded recipes: {recipes}")
 
-        # Determine feasible potions and calculate how many of each can be made
         potion_counts = {}
         for potion_id, recipe in recipes.items():
             if all((local_inventory[i] >= recipe[i] if recipe[i] > 0 else True) for i in range(4)):
@@ -105,7 +104,6 @@ def get_bottle_plan():
             print("DEBUG: No feasible potions to be made.")
             return []
 
-        # Determine a reasonable distribution of potions
         total_potion_count = sum(potion_counts.values())
         if total_potion_count > max_allowed_potions:
             scale_factor = max_allowed_potions / total_potion_count
@@ -118,7 +116,6 @@ def get_bottle_plan():
             for i in range(4):
                 if recipe[i] > 0:
                     local_inventory[i] -= recipe[i] * count
-            # Append color array to the bottle plan
             bottle_plan.append({"potion_type": recipes[potion_id], "quantity": count})
 
         print(f"DEBUG: FINAL BOTTLE PLAN: {bottle_plan}")
