@@ -68,47 +68,57 @@ import sqlalchemy
 @router.post("/plan")
 def get_bottle_plan():
     with db.engine.begin() as connection:
-        # fetch potion capacity 
+        # Fetch potion capacity
         capacity_result = connection.execute(sqlalchemy.text("SELECT potion_capacity FROM capacity LIMIT 1"))
         capacity_data = capacity_result.scalar()
-        max_allowed_potions = capacity_data * 50 
+        max_allowed_potions = capacity_data * 50
+        print(f"DEBUG: Max allowed potions based on capacity: {max_allowed_potions}")
 
-        # fetch current potions
+        # Fetch current potions
         result = connection.execute(sqlalchemy.text("SELECT COALESCE(SUM(quantity_change), 0) FROM potion_ledger"))
         total_existing_potions = result.scalar()
+        print(f"DEBUG: Total existing potions: {total_existing_potions}")
 
-        # max bottles
         max_allowed_potions -= total_existing_potions
         if max_allowed_potions <= 0:
             print("DEBUG: No bottling needed, sufficient stock available.")
             return []
 
-        # fetch ml inventory
+        # Fetch ML inventory
         sql = "SELECT COALESCE(SUM(red_change), 0), COALESCE(SUM(green_change), 0), COALESCE(SUM(blue_change), 0), COALESCE(SUM(dark_change), 0) FROM ml_ledger"
         result = connection.execute(sqlalchemy.text(sql))
-        inventory = [amount or 0 for amount in result.fetchone()]
-        local_inventory = inventory[:]
+        local_inventory = [amount or 0 for amount in result.fetchone()]
+        print(f"DEBUG: Local ML inventory: {local_inventory}")
 
-        # load recipes
+        # Load recipes
         recipes_result = connection.execute(sqlalchemy.text("SELECT red, green, blue, dark, id FROM potions"))
         recipes = {row.id: [row.red, row.green, row.blue, row.dark] for row in recipes_result}
+        print(f"DEBUG: Loaded recipes: {recipes}")
+
+        # Determine feasible potions and calculate how many of each can be made
+        potion_counts = {}
+        for potion_id, recipe in recipes.items():
+            if all((local_inventory[i] >= recipe[i] if recipe[i] > 0 else True) for i in range(4)):
+                potion_counts[potion_id] = min((local_inventory[i] // recipe[i] if recipe[i] > 0 else float('inf')) for i in range(4))
+
+        if not potion_counts:
+            print("DEBUG: No feasible potions to be made.")
+            return []
+
+        # Determine a reasonable distribution of potions
+        total_potion_count = sum(potion_counts.values())
+        if total_potion_count > max_allowed_potions:
+            scale_factor = max_allowed_potions / total_potion_count
+            for potion_id in potion_counts:
+                potion_counts[potion_id] = int(potion_counts[potion_id] * scale_factor)
 
         bottle_plan = []
-        # calculate the maximum bottles per potion based on the local inventory
-        for potion_id, recipe in recipes.items():
-            if any(recipe):  
-                max_bottles_for_recipe = min((local_inventory[i] // recipe[i] if recipe[i] > 0 else float('inf')) for i in range(4))
-                if max_bottles_for_recipe > 0:
-                    allocated_bottles = min(max_bottles_for_recipe, max_allowed_potions)
-                    if allocated_bottles > 0:
-                        # adjust local inventory based on the allocated bottles
-                        for i in range(4):
-                            if recipe[i] > 0:
-                                local_inventory[i] -= recipe[i] * allocated_bottles
-                        bottle_plan.append({"potion_type": recipes[potion_id], "quantity": allocated_bottles})
-                        max_allowed_potions -= allocated_bottles
-                        if max_allowed_potions <= 0:
-                            break
+        for potion_id, count in potion_counts.items():
+            recipe = recipes[potion_id]
+            for i in range(4):
+                if recipe[i] > 0:
+                    local_inventory[i] -= recipe[i] * count
+            bottle_plan.append({"potion_type": potion_id, "quantity": count})
 
         print(f"DEBUG: FINAL BOTTLE PLAN: {bottle_plan}")
         return bottle_plan
