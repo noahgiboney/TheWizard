@@ -118,7 +118,8 @@ def get_bottle_plan():
             for i in range(4):
                 if recipe[i] > 0:
                     local_inventory[i] -= recipe[i] * count
-            bottle_plan.append({"potion_type": potion_id, "quantity": count})
+            # Append color array to the bottle plan
+            bottle_plan.append({"potion_type": recipes[potion_id], "quantity": count})
 
         print(f"DEBUG: FINAL BOTTLE PLAN: {bottle_plan}")
         return bottle_plan
