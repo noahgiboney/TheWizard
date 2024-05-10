@@ -112,11 +112,12 @@ def get_bottle_plan():
 
         bottle_plan = []
         for potion_id, count in potion_counts.items():
-            recipe = recipes[potion_id]
-            for i in range(4):
-                if recipe[i] > 0:
-                    local_inventory[i] -= recipe[i] * count
-            bottle_plan.append({"potion_type": recipes[potion_id], "quantity": count})
+            if count > 0:  # Ensure only non-zero quantities are added to the plan
+                recipe = recipes[potion_id]
+                for i in range(4):
+                    if recipe[i] > 0:
+                        local_inventory[i] -= recipe[i] * count
+                bottle_plan.append({"potion_type": recipes[potion_id], "quantity": count})
 
         print(f"DEBUG: FINAL BOTTLE PLAN: {bottle_plan}")
         return bottle_plan
