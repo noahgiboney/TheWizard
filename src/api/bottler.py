@@ -95,20 +95,27 @@ def get_bottle_plan():
         recipes = {row.id: [row.red, row.green, row.blue, row.dark] for row in recipes_result}
         print(f"DEBUG: Loaded recipes: {recipes}")
 
+        # Calculate maximum possible potions for each type
         potion_counts = {}
         for potion_id, recipe in recipes.items():
-            if all((local_inventory[i] >= recipe[i] if recipe[i] > 0 else True) for i in range(4)):
-                potion_counts[potion_id] = min((local_inventory[i] // recipe[i] if recipe[i] > 0 else float('inf')) for i in range(4))
+            potion_counts[potion_id] = min((local_inventory[i] // recipe[i] if recipe[i] > 0 else float('inf')) for i in range(4))
 
-        if not potion_counts:
-            print("DEBUG: No feasible potions to be made.")
-            return []
+        # Normalize distribution
+        min_possible_potions = min(potion_counts.values())
+        for potion_id in potion_counts:
+            potion_counts[potion_id] = min_possible_potions
 
-        total_potion_count = sum(potion_counts.values())
-        if total_potion_count > max_allowed_potions:
-            scale_factor = max_allowed_potions / total_potion_count
-            for potion_id in potion_counts:
-                potion_counts[potion_id] = int(potion_counts[potion_id] * scale_factor)
+        remaining_capacity = max_allowed_potions - sum(potion_counts.values())
+        potion_ids_sorted_by_size = sorted(potion_counts, key=lambda x: sum(recipes[x]))
+        
+        # Distribute remaining capacity
+        while remaining_capacity > 0:
+            for potion_id in potion_ids_sorted_by_size:
+                if remaining_capacity > 0:
+                    potion_counts[potion_id] += 1
+                    remaining_capacity -= 1
+                if remaining_capacity <= 0:
+                    break
 
         bottle_plan = []
         for potion_id, count in potion_counts.items():
@@ -117,7 +124,7 @@ def get_bottle_plan():
                 for i in range(4):
                     if recipe[i] > 0:
                         local_inventory[i] -= recipe[i] * count
-                bottle_plan.append({"potion_type": recipes[potion_id], "quantity": count})
+                bottle_plan.append({"potion_type": recipe, "quantity": count})
 
         print(f"DEBUG: FINAL BOTTLE PLAN: {bottle_plan}")
         return bottle_plan
