@@ -79,10 +79,13 @@ def get_bottle_plan():
         total_existing_potions = result.scalar()
         print(f"DEBUG: Total existing potions: {total_existing_potions}")
 
-        max_allowed_potions -= total_existing_potions
-        if max_allowed_potions <= 0:
+        # Calculate the additional potions that can be made
+        additional_potions_allowed = max_allowed_potions - total_existing_potions
+        if additional_potions_allowed <= 0:
             print("DEBUG: No bottling needed, sufficient stock available.")
             return []
+
+        print(f"DEBUG: Additional potions allowed: {additional_potions_allowed}")
 
         # Fetch ML inventory
         sql = "SELECT COALESCE(SUM(red_change), 0), COALESCE(SUM(green_change), 0), COALESCE(SUM(blue_change), 0), COALESCE(SUM(dark_change), 0) FROM ml_ledger"
@@ -95,35 +98,37 @@ def get_bottle_plan():
         recipes = {row.id: [row.red, row.green, row.blue, row.dark] for row in recipes_result}
         print(f"DEBUG: Loaded recipes: {recipes}")
 
-        # Calculate maximum possible potions for each type
+        # Calculate maximum possible potions for each type, ensuring only feasible recipes are considered
         potion_counts = {}
+        feasible_recipes = {}
         for potion_id, recipe in recipes.items():
-            potion_counts[potion_id] = min((local_inventory[i] // recipe[i] if recipe[i] > 0 else float('inf')) for i in range(4))
+            if all(local_inventory[i] >= recipe[i] for i in range(4) if recipe[i] > 0):
+                feasible_potions = min((local_inventory[i] // recipe[i] if recipe[i] > 0 else float('inf')) for i in range(4))
+                if feasible_potions > 0:
+                    potion_counts[potion_id] = feasible_potions
+                    feasible_recipes[potion_id] = recipe
+            else:
+                print(f"DEBUG: Cannot make potion {potion_id} due to insufficient ingredients")
 
-        # Normalize distribution
-        min_possible_potions = min(potion_counts.values())
-        for potion_id in potion_counts:
-            potion_counts[potion_id] = min_possible_potions
+        # Normalize distribution to ensure even distribution of potion types without exceeding the additional potions allowed
+        if potion_counts:
+            min_possible_potions = min(potion_counts.values())
+            normalized_total = min(additional_potions_allowed, min_possible_potions * len(potion_counts))
+            evenly_distributed = normalized_total // len(potion_counts)
+            for potion_id in potion_counts:
+                potion_counts[potion_id] = evenly_distributed
 
-        remaining_capacity = max_allowed_potions - sum(potion_counts.values())
-        potion_ids_sorted_by_size = sorted(potion_counts, key=lambda x: sum(recipes[x]))
-        
-        # Distribute remaining capacity
-        while remaining_capacity > 0:
-            for potion_id in potion_ids_sorted_by_size:
-                if remaining_capacity > 0:
+            # Handle any remainder if the total doesn't divide evenly
+            remainder = normalized_total % len(potion_counts)
+            for potion_id in sorted(potion_counts, key=potion_counts.get):
+                if remainder > 0:
                     potion_counts[potion_id] += 1
-                    remaining_capacity -= 1
-                if remaining_capacity <= 0:
-                    break
+                    remainder -= 1
 
         bottle_plan = []
         for potion_id, count in potion_counts.items():
             if count > 0:  # Ensure only non-zero quantities are added to the plan
-                recipe = recipes[potion_id]
-                for i in range(4):
-                    if recipe[i] > 0:
-                        local_inventory[i] -= recipe[i] * count
+                recipe = feasible_recipes[potion_id]
                 bottle_plan.append({"potion_type": recipe, "quantity": count})
 
         print(f"DEBUG: FINAL BOTTLE PLAN: {bottle_plan}")
