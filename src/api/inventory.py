@@ -64,7 +64,7 @@ def get_capacity_plan():
     """Plan how many capacities of potions and ml can be bought based on available gold."""
 
     return {
-        "potion_capacity": 6,
+        "potion_capacity": 10,
         "ml_capacity": 3
     }
 
