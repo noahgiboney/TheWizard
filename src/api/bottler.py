@@ -110,29 +110,71 @@ def get_bottle_plan():
             else:
                 print(f"DEBUG: Cannot make potion {potion_id} due to insufficient ingredients")
 
+        print(f"DEBUG: Feasible potion counts: {potion_counts}")
+
         # Normalize distribution to ensure even distribution of potion types without exceeding the additional potions allowed
         if potion_counts:
+            total_potions = sum(potion_counts.values())
             min_possible_potions = min(potion_counts.values())
-            normalized_total = min(additional_potions_allowed, min_possible_potions * len(potion_counts))
+            normalized_total = min(additional_potions_allowed, total_potions)
             evenly_distributed = normalized_total // len(potion_counts)
+            remainder = normalized_total % len(potion_counts)
+
             for potion_id in potion_counts:
                 potion_counts[potion_id] = evenly_distributed
 
             # Handle any remainder if the total doesn't divide evenly
-            remainder = normalized_total % len(potion_counts)
-            for potion_id in sorted(potion_counts, key=potion_counts.get):
+            for potion_id in sorted(potion_counts.keys(), key=lambda x: potion_counts[x], reverse=True):
                 if remainder > 0:
                     potion_counts[potion_id] += 1
                     remainder -= 1
 
-        bottle_plan = []
+        print(f"DEBUG: Normalized potion counts: {potion_counts}")
+
+        # Calculate total ML usage
+        total_used_inventory = [0, 0, 0, 0]
         for potion_id, count in potion_counts.items():
+            recipe = feasible_recipes[potion_id]
+            for i in range(4):
+                total_used_inventory[i] += recipe[i] * count
+
+        print(f"DEBUG: Total ML usage before adjustment: {total_used_inventory}")
+
+        # Adjust potion counts to fit within the local inventory limits
+        adjusted_potion_counts = potion_counts.copy()
+        for i in range(4):
+            if total_used_inventory[i] > local_inventory[i]:
+                excess = total_used_inventory[i] - local_inventory[i]
+                print(f"DEBUG: Ingredient {i} exceeds inventory by {excess} units")
+                for potion_id, count in sorted(adjusted_potion_counts.items(), key=lambda x: feasible_recipes[x[0]][i], reverse=True):
+                    if feasible_recipes[potion_id][i] > 0:
+                        max_reduction = adjusted_potion_counts[potion_id]  # Max we can reduce is the current count
+                        needed_reduction = (excess + feasible_recipes[potion_id][i] - 1) // feasible_recipes[potion_id][i]  # Calculate needed reduction
+                        reduction = min(max_reduction, needed_reduction)  # Reduce by the lesser of max_reduction or needed_reduction
+                        adjusted_potion_counts[potion_id] -= reduction
+                        reduction_amount = reduction * feasible_recipes[potion_id][i]
+                        excess -= reduction_amount
+                        total_used_inventory[i] -= reduction_amount
+                        print(f"DEBUG: Reducing potion {potion_id} by {reduction} units, {reduction_amount} ml, new count: {adjusted_potion_counts[potion_id]}, remaining excess: {excess}")
+                        if excess <= 0:
+                            break
+
+        print(f"DEBUG: Adjusted potion counts: {adjusted_potion_counts}")
+        print(f"DEBUG: Total ML usage after adjustment: {total_used_inventory}")
+
+        # Verify final ML usage is within inventory limits
+        final_bottle_plan = []
+        for potion_id, count in adjusted_potion_counts.items():
             if count > 0:  # Ensure only non-zero quantities are added to the plan
                 recipe = feasible_recipes[potion_id]
-                bottle_plan.append({"potion_type": recipe, "quantity": count})
+                final_bottle_plan.append({"potion_type": recipe, "quantity": count})
 
-        print(f"DEBUG: FINAL BOTTLE PLAN: {bottle_plan}")
-        return bottle_plan
+        print(f"DEBUG: FINAL BOTTLE PLAN: {final_bottle_plan}")
+        for i, amount in enumerate(local_inventory):
+            if total_used_inventory[i] > amount:
+                print(f"ERROR: Ingredient {i} still exceeds inventory limits after adjustment. Used: {total_used_inventory[i]}, Available: {amount}")
+
+        return final_bottle_plan
 
 if __name__ == "__main__":
     print(get_bottle_plan())
